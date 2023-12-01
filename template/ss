@@ -1,0 +1,1 @@
+"outbounds":[{"protocol":"shadowsocks","settings":{"servers":[{"address":"","port":0,"method":"","password":""}]},"tag":"outBound_PROXY","streamSettings":{"network":"tcp","sockopt":{"mark":255},"httpSettings":{"host":[],"path":"/"}}}

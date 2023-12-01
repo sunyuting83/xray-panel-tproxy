@@ -1,0 +1,9 @@
+.git
+Core/
+static/
+backup/
+tmp/
+xpanel-web/build
+xpanel-web/node_modules
+xpanel-web/README.md
+xpanel-web/yarn.lock

@@ -1,0 +1,1 @@
+"outbounds":[{"protocol":"vless","settings":{"vnext":[{"address":"","port":0,"users":[{"encryption":"none","id":""}]}]},"streamSettings":{"mark":255,"network":"","security":"","wsSettings":{"headers":{"Host":""},"path":""}},"tag":"outBound_PROXY"}
