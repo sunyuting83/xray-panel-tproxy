@@ -320,7 +320,7 @@ func DeleteNode(i int, p string) (b bool) {
 		}
 		Arrlen := len(result)
 		if Arrlen > 0 {
-			for index, _ := range result {
+			for index := range result {
 				if index == i {
 					if i == Arrlen-1 {
 						result = result[0:i]
