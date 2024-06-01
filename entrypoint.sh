@@ -9,6 +9,8 @@ check_and_delete_rule() {
         echo "Deleting rule and route..."
         ip rule delete fwmark 1 table 100
         ip route delete local default dev lo table 100
+        ip -6 rule delete fwmark 1 table 106
+        ip -6 route delete local ::/0 dev lo table 106
     else
         echo "Rule not found. Nothing to delete."
     fi
@@ -21,6 +23,8 @@ reset_iptables(){
     check_and_delete_rule
     ip rule add fwmark 1 table 100
     ip route add local default dev lo table 100
+    ip -6 rule add fwmark 1 table 106
+    ip -6 route add local ::/0 dev lo table 106
     iptables -P INPUT ACCEPT
     iptables -P FORWARD ACCEPT
     iptables -P OUTPUT ACCEPT
@@ -51,10 +55,24 @@ set_xray_iptables(){
     iptables -t mangle -A XRAY -p udp -j TPROXY --on-port 7892 --tproxy-mark 1
     iptables -t mangle -A PREROUTING -j XRAY
 
+    ip6tables -t mangle -N XRAY6_MASK
+    ip6tables -t mangle -A XRAY6_MASK -d fe80::/10 -j RETURN
+    ip6tables -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp -j RETURN
+    ip6tables -t mangle -A XRAY6_MASK -d fd00::/8 -p udp ! --dport 53 -j RETURN
+    ip6tables -t mangle -A XRAY6_MASK -j RETURN -m mark --mark 0xff
+    ip6tables -t mangle -A XRAY6_MASK -p udp -j MARK --set-mark 1
+    ip6tables -t mangle -A XRAY6_MASK -p tcp -j MARK --set-mark 1
+    ip6tables -t mangle -A OUTPUT -j XRAY6_MASK
+
     iptables -t mangle -N DIVERT
     iptables -t mangle -A DIVERT -j MARK --set-mark 1
     iptables -t mangle -A DIVERT -j ACCEPT
     iptables -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
+
+    ip6tables -t mangle -N DIVERT
+    ip6tables -t mangle -A DIVERT -j MARK --set-mark 1
+    ip6tables -t mangle -A DIVERT -j ACCEPT
+    ip6tables -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
 }
 
 reset_iptables
