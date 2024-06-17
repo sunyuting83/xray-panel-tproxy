@@ -979,8 +979,8 @@ func CheckCore(OS, platform, CurrentPath string) {
 	}
 	CoreZip := strings.Join([]string{CoreFile, "zip"}, ".")
 	CoreZipFileName := strings.Join([]string{CorePath, CoreZip}, "/")
-	CoreGeoIPFileName := strings.Join([]string{CorePath, "geoip.dat"}, "/")
-	CoreGeoSiteFileName := strings.Join([]string{CorePath, "geosite.dat"}, "/")
+	// CoreGeoIPFileName := strings.Join([]string{CorePath, "geoip.dat"}, "/")
+	// CoreGeoSiteFileName := strings.Join([]string{CorePath, "geosite.dat"}, "/")
 	CoreFileName := strings.Join([]string{CorePath, "xray"}, "/")
 	if !IsExist(CoreFileName) {
 		fmt.Println("核心不存在,请等待下载,整个过程预计半小时,取决于网络环境")
@@ -1009,40 +1009,40 @@ func CheckCore(OS, platform, CurrentPath string) {
 		}
 		fileMD5 := Md5File(CoreZipFileName)
 		if fileMD5 == MD5 {
-			fmt.Println("开始下载规则库")
+			// fmt.Println("开始下载规则库")
 			Unzip(CoreZipFileName, CorePath)
-			os.Remove(CoreGeoIPFileName)
-			os.Remove(CoreGeoSiteFileName)
-			_, GeoIPUri, GeoSiteUri, GeoVersion, err := GetVersionData(config.ProxyUrl, config.GeoVersionUrl, "", true, false)
-			if err != nil {
-				fmt.Println("获取IP规则库失败,请重新启动")
-				os.Exit(0)
-			}
-			for _, item := range config.ProxyUrl {
-				uri := strings.Join([]string{item, GeoIPUri}, "")
-				err := DownloadFile(uri, CoreGeoIPFileName)
-				fmt.Println("下载IP规则库")
-				if err != nil {
-					fmt.Println("忽略下面的错误,开始魔法下载.速度很慢,请耐心等待")
-					fmt.Println(err)
-				} else {
-					fmt.Println("下载IP规则库成功")
-					break
-				}
-			}
-			for _, item := range config.ProxyUrl {
-				uri := strings.Join([]string{item, GeoSiteUri}, "")
-				err := DownloadFile(uri, CoreGeoSiteFileName)
-				fmt.Println("下载域名规则库")
-				if err != nil {
-					fmt.Println("忽略下面的错误,开始魔法下载.速度很慢,请耐心等待")
-					fmt.Println(err)
-				} else {
-					fmt.Println("下载域名规则库成功")
-					break
-				}
-			}
-			config.GeoVersion = GeoVersion
+			// os.Remove(CoreGeoIPFileName)
+			// os.Remove(CoreGeoSiteFileName)
+			// _, GeoIPUri, GeoSiteUri, GeoVersion, err := GetVersionData(config.ProxyUrl, config.GeoVersionUrl, "", true, false)
+			// if err != nil {
+			// 	fmt.Println("获取IP规则库失败,请重新启动")
+			// 	os.Exit(0)
+			// }
+			// for _, item := range config.ProxyUrl {
+			// 	uri := strings.Join([]string{item, GeoIPUri}, "")
+			// 	err := DownloadFile(uri, CoreGeoIPFileName)
+			// 	fmt.Println("下载IP规则库")
+			// 	if err != nil {
+			// 		fmt.Println("忽略下面的错误,开始魔法下载.速度很慢,请耐心等待")
+			// 		fmt.Println(err)
+			// 	} else {
+			// 		fmt.Println("下载IP规则库成功")
+			// 		break
+			// 	}
+			// }
+			// for _, item := range config.ProxyUrl {
+			// 	uri := strings.Join([]string{item, GeoSiteUri}, "")
+			// 	err := DownloadFile(uri, CoreGeoSiteFileName)
+			// 	fmt.Println("下载域名规则库")
+			// 	if err != nil {
+			// 		fmt.Println("忽略下面的错误,开始魔法下载.速度很慢,请耐心等待")
+			// 		fmt.Println(err)
+			// 	} else {
+			// 		fmt.Println("下载域名规则库成功")
+			// 		break
+			// 	}
+			// }
+			// config.GeoVersion = GeoVersion
 			config.CoreVersion = version
 			saveConfig, _ := json.Marshal(config)
 			path, _ := os.Executable()

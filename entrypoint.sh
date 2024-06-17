@@ -34,6 +34,15 @@ reset_iptables(){
     iptables -t mangle -Z
     iptables -F
     iptables -X
+    ip6tables-nft -P INPUT ACCEPT
+    ip6tables-nft -P FORWARD ACCEPT
+    ip6tables-nft -P OUTPUT ACCEPT
+    ip6tables-nft -t nat -F
+    ip6tables-nft -t mangle -F
+    ip6tables-nft -t mangle -X
+    ip6tables-nft -t mangle -Z
+    ip6tables-nft -F
+    ip6tables-nft -X
 }
 
 set_xray_iptables(){
@@ -55,24 +64,24 @@ set_xray_iptables(){
     iptables -t mangle -A XRAY -p udp -j TPROXY --on-port 7892 --tproxy-mark 1
     iptables -t mangle -A PREROUTING -j XRAY
 
-    ip6tables -t mangle -N XRAY6_MASK
-    ip6tables -t mangle -A XRAY6_MASK -d fe80::/10 -j RETURN
-    ip6tables -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp -j RETURN
-    ip6tables -t mangle -A XRAY6_MASK -d fd00::/8 -p udp ! --dport 53 -j RETURN
-    ip6tables -t mangle -A XRAY6_MASK -j RETURN -m mark --mark 0xff
-    ip6tables -t mangle -A XRAY6_MASK -p udp -j MARK --set-mark 1
-    ip6tables -t mangle -A XRAY6_MASK -p tcp -j MARK --set-mark 1
-    ip6tables -t mangle -A OUTPUT -j XRAY6_MASK
+    ip6tables-nft -t mangle -N XRAY6_MASK
+    ip6tables-nft -t mangle -A XRAY6_MASK -d fe80::/10 -j RETURN
+    ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp -j RETURN
+    ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p udp ! --dport 53 -j RETURN
+    ip6tables-nft -t mangle -A XRAY6_MASK -j RETURN -m mark --mark 0xff
+    ip6tables-nft -t mangle -A XRAY6_MASK -p udp -j MARK --set-mark 1
+    ip6tables-nft -t mangle -A XRAY6_MASK -p tcp -j MARK --set-mark 1
+    ip6tables-nft -t mangle -A OUTPUT -j XRAY6_MASK
 
     iptables -t mangle -N DIVERT
     iptables -t mangle -A DIVERT -j MARK --set-mark 1
     iptables -t mangle -A DIVERT -j ACCEPT
     iptables -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
 
-    ip6tables -t mangle -N DIVERT
-    ip6tables -t mangle -A DIVERT -j MARK --set-mark 1
-    ip6tables -t mangle -A DIVERT -j ACCEPT
-    ip6tables -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
+    ip6tables-nft -t mangle -N DIVERT
+    ip6tables-nft -t mangle -A DIVERT -j MARK --set-mark 1
+    ip6tables-nft -t mangle -A DIVERT -j ACCEPT
+    ip6tables-nft -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
 }
 
 reset_iptables
