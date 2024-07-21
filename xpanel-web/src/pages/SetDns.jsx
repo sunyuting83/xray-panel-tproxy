@@ -34,7 +34,7 @@ const SetDns = () => {
       if(typeof el !== "string") {
         if (el.domains[0] === domain) {
           if (port) {
-            el.port = e.target.value
+            el.port = Number(e.target.value)
           }else{
             el.address = e.target.value
           }

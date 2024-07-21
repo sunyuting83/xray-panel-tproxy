@@ -450,8 +450,8 @@ func GetIgnore(p string) (string, error) {
 	return string(data), nil
 }
 
-func GetDns(p string) (interface{}, error) {
-	var m interface{}
+func GetDns(p string) ([]interface{}, error) {
+	var m []interface{}
 	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
 	data, err := os.ReadFile(jsonFile)
 	if err != nil {
@@ -473,7 +473,7 @@ func GetDns(p string) (interface{}, error) {
 }
 
 func SetDns(p, data string) bool {
-	var m interface{}
+	var m []interface{}
 	err := json.Unmarshal([]byte(data), &m)
 	if err != nil {
 		return false
