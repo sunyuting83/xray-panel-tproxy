@@ -21,11 +21,19 @@ WORKDIR /app
 RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 RUN apk add --no-cache musl-dev
 RUN mkdir /lib64
-RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-RUN ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2
+RUN echo "Debug: uname -m output:" && uname -m && \
+    echo "Debug: ARCH variable:" && echo $ARCH && \
+    /bin/sh -c 'ARCH=$(uname -m) && \
+    echo "Debug: ARCH inside shell:" && echo $ARCH && \
+    echo "Architecture is: $ARCH" && \
+    ln -s "/lib/libc.musl-$ARCH.so.1" "/lib64/ld-linux-$ARCH.so.2"'
+RUN ls /lib64
+# RUN ln -s /usr/lib/libc.so /usr/lib/libc.so
 
-ADD https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz /usr/local
-RUN tar -xf /usr/local/upx-4.2.1-amd64_linux.tar.xz -C /usr/local && mv /usr/local/upx-4.2.1-amd64_linux/upx /bin/upx && \
+
+ADD https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz /usr/local/
+RUN ls /usr/local
+RUN tar -xf /usr/local/upx-4.2.4-amd64_linux.tar.xz -C /usr/local && mv /usr/local/upx-4.2.4-amd64_linux/upx /bin/upx && \
     chmod a+x /bin/upx
 
 RUN go env -w GOPROXY=https://goproxy.cn,direct
@@ -54,8 +62,14 @@ RUN apk add --no-cache \
  musl-dev \
  ip6tables
 RUN mkdir /lib64
-RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-RUN ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2
+RUN echo "Debug: uname -m output:" && uname -m && \
+    echo "Debug: ARCH variable:" && echo $ARCH && \
+    /bin/sh -c 'ARCH=$(uname -m) && \
+    echo "Debug: ARCH inside shell:" && echo $ARCH && \
+    echo "Architecture is: $ARCH" && \
+    ln -s "/lib/libc.musl-$ARCH.so.1" "/lib64/ld-linux-$ARCH.so.2"'
+RUN ls /lib64
+# RUN ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2
 RUN rm -rf /var/cache/apk/*
 RUN chmod a+x /usr/bin/entrypoint.sh
 
