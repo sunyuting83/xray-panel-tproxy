@@ -12,6 +12,7 @@ import (
 	config "xpanel/Config"
 
 	"github.com/olahol/melody"
+	"golang.org/x/net/proxy"
 )
 
 func SendMessageToWs(m *melody.Melody, ID, types, message string) {
@@ -25,8 +26,23 @@ func SendMessageToWs(m *melody.Melody, ID, types, message string) {
 }
 
 func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Version string, m *melody.Melody) {
+
+	socksProxy := "127.0.0.1:7891"
+
+	// 创建一个 SOCKS5 dialer
+	dialer, err := proxy.SOCKS5("tcp", socksProxy, nil, proxy.Direct)
+	if err != nil {
+		panic(err)
+	}
+
+	// 创建一个自定义的 HTTP Transport
+	transport := &http.Transport{
+		Dial: dialer.Dial,
+	}
+
 	client := &http.Client{
-		Timeout: 600 * time.Second,
+		Transport: transport,
+		Timeout:   600 * time.Second,
 	}
 
 	req, err := http.NewRequest("GET", url, nil)

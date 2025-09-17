@@ -1132,6 +1132,9 @@ func GetVersionData(ProxyUri []string, VersionUrl, CoreZip string, geo, proxy bo
 	var downUri string
 	for _, item := range ProxyUri {
 		uri := strings.Join([]string{item, VersionUrl}, "")
+		if item == "" {
+			uri = VersionUrl
+		}
 		data, err := datafactory.GetData(uri, proxy)
 		if err == nil {
 			var (

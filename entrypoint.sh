@@ -56,7 +56,7 @@ set_xray_iptables(){
     iptables -t mangle -A XRAY -d 224.0.0.0/4 -j RETURN
     iptables -t mangle -A XRAY -d 240.0.0.0/4 -j RETURN
     iptables -t mangle -A XRAY -d 255.255.255.255/32 -j RETURN
-    iptables -t mangle -A XRAY -s 192.168.1.45 -j RETURN -m mark --mark 1
+#    iptables -t mangle -A XRAY -s 192.168.1.45 -j RETURN -m mark --mark 1
     iptables -t mangle -A XRAY -d 192.168.0.0/16 -p tcp ! --dport 53 -j RETURN
     iptables -t mangle -A XRAY -d 192.168.0.0/16 -p udp ! --dport 53 -j RETURN
     iptables -t mangle -A XRAY -j RETURN -m mark --mark 0xff
@@ -66,12 +66,12 @@ set_xray_iptables(){
 
     ip6tables-nft -t mangle -N XRAY6_MASK
     ip6tables-nft -t mangle -A XRAY6_MASK -d fe80::/10 -j RETURN
-    ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp -j RETURN
+    ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp ! --dport 53 -j RETURN
     ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p udp ! --dport 53 -j RETURN
     ip6tables-nft -t mangle -A XRAY6_MASK -j RETURN -m mark --mark 0xff
-    ip6tables-nft -t mangle -A XRAY6_MASK -p udp -j MARK --set-mark 1
-    ip6tables-nft -t mangle -A XRAY6_MASK -p tcp -j MARK --set-mark 1
-    ip6tables-nft -t mangle -A OUTPUT -j XRAY6_MASK
+    ip6tables-nft -t mangle -A XRAY6_MASK -p udp -j TPROXY --on-port 7892 --tproxy-mark 1
+    ip6tables-nft -t mangle -A XRAY6_MASK -p tcp -j TPROXY --on-port 7892 --tproxy-mark 1
+    ip6tables-nft -t mangle -A PREROUTING -j XRAY6_MASK
 
     iptables -t mangle -N DIVERT
     iptables -t mangle -A DIVERT -j MARK --set-mark 1

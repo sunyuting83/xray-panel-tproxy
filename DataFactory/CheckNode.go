@@ -71,7 +71,6 @@ func SyncCheckData(m *melody.Melody, ID string) {
 		}()
 	}
 	wg.Wait()
-	return
 }
 
 func Float64ToStringWithPrecision(value float64, precision int) string {
