@@ -1,4 +1,4 @@
-package utils
+package websocket
 
 import (
 	"encoding/json"
@@ -6,26 +6,17 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	config "xpanel/Config"
 
-	"github.com/olahol/melody"
+	"xpanel/utils"
+
 	"golang.org/x/net/proxy"
 )
 
-func SendMessageToWs(m *melody.Melody, ID, types, message string) {
-	speeData := &config.Message{
-		Type: types,
-		UUID: ID,
-		Data: message,
-	}
-	sedData, _ := json.Marshal(speeData)
-	m.Broadcast(sedData)
-}
-
-func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Version string, m *melody.Melody) {
+func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Version string) {
 
 	socksProxy := "127.0.0.1:7891"
 
@@ -49,7 +40,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 	if err != nil {
 		// fmt.Println("创建请求时发生错误:", err)
 		message := strings.Join([]string{FileName, "创建请求时发生错误"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 		return
 	}
 
@@ -62,7 +53,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 	if err != nil {
 		// fmt.Println("下载文件时发生错误:", err)
 		message := strings.Join([]string{FileName, "下载文件时发生错误"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 		return
 	}
 	defer resp.Body.Close()
@@ -70,7 +61,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 	if resp.StatusCode != http.StatusOK {
 		// fmt.Printf("下载文件时返回非200状态码: %d\n", resp.StatusCode)
 		message := strings.Join([]string{FileName, "下载文件时返回非200状态码"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 		return
 	}
 
@@ -78,7 +69,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 	if err != nil {
 		// fmt.Println("创建文件时发生错误:", err)
 		message := strings.Join([]string{FileName, "创建文件时发生错误"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 		return
 	}
 	defer out.Close()
@@ -96,7 +87,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 		if err != nil && err != io.EOF {
 			// fmt.Println("下载文件时发生错误:", err)
 			message := strings.Join([]string{FileName, "下载文件时发生错误"}, "----")
-			SendMessageToWs(m, ID, "error", message)
+			Manager.SendMessageToWs(ID, "error", message)
 			return
 		}
 
@@ -110,7 +101,7 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 		if percentage > percen {
 			percenStr := strconv.Itoa(percentage)
 			message := strings.Join([]string{FileName, percenStr}, "----")
-			SendMessageToWs(m, ID, "download", message)
+			Manager.SendMessageToWs(ID, "download", message)
 		}
 		percen = percentage
 
@@ -118,45 +109,45 @@ func DownloadFileWithHeaders(url, filePath, ID, FileName, CoreFile, dataPath, Ve
 		if err != nil {
 			// fmt.Println("写入文件时发生错误:", err)
 			message := strings.Join([]string{FileName, "写入文件时发生错误"}, "----")
-			SendMessageToWs(m, ID, "error", message)
+			Manager.SendMessageToWs(ID, "error", message)
 			return
 		}
 	}
 
 	message := strings.Join([]string{FileName, "100"}, "----")
-	SendMessageToWs(m, ID, "download", message)
+	Manager.SendMessageToWs(ID, "download", message)
 
-	config := GetConfig()
+	config := utils.GetConfig()
 	if strings.Contains(CoreFile, "Xray") {
 		config.CoreVersion = Version
-		RunXrayWithoutConfig("stop")
+		utils.RunXrayWithoutConfig("stop")
 
-		CurrentPath, _ := GetCurrentPath()
-		tmpPath := strings.Join([]string{CurrentPath, "tmp"}, "/")
-		CoreTmpPath := strings.Join([]string{tmpPath, "Xcore"}, "/")
-		CorePath := strings.Join([]string{CurrentPath, "Core"}, "/")
-		NewCoreFile := strings.Join([]string{CorePath, "xray"}, "/")
-		tmpFileXray := strings.Join([]string{CoreTmpPath, "xray"}, "/")
+		CurrentPath, _ := utils.GetCurrentPath()
+		tmpPath := filepath.Join(CurrentPath, "tmp")
+		CoreTmpPath := filepath.Join(tmpPath, "Xcore")
+		CorePath := filepath.Join(CurrentPath, "Core")
+		NewCoreFile := filepath.Join(CorePath, "xray")
+		tmpFileXray := filepath.Join(CoreTmpPath, "xray")
 		// fmt.Println(NewCoreFile)
 		// fmt.Println(CoreTmpPath)
 		// fmt.Println(tmpFileXray)
-		Unzip(filePath, CoreTmpPath)
+		utils.Unzip(filePath, CoreTmpPath)
 		os.Remove(filePath)
 		os.Remove(NewCoreFile)
 		os.Rename(tmpFileXray, NewCoreFile)
 		deleteFiles(CoreTmpPath)
 		os.Remove(CoreTmpPath)
 		os.Chmod(NewCoreFile, 0777)
-		RunXrayWithoutConfig("start")
+		utils.RunXrayWithoutConfig("start")
 		message = strings.Join([]string{FileName, "已更新到最新版本"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 	} else {
-		RunXrayWithoutConfig("stop")
+		utils.RunXrayWithoutConfig("stop")
 		os.Remove(CoreFile)
 		os.Rename(filePath, CoreFile)
-		RunXrayWithoutConfig("start")
+		utils.RunXrayWithoutConfig("start")
 		message = strings.Join([]string{FileName, "已更新到最新版本"}, "----")
-		SendMessageToWs(m, ID, "error", message)
+		Manager.SendMessageToWs(ID, "error", message)
 		config.GeoVersion = Version
 	}
 	saveConfig, _ := json.Marshal(config)
@@ -197,23 +188,34 @@ func deleteFiles(dir string) error {
 	return nil
 }
 
-func MakeWsData(m *melody.Melody, ID, Data string) {
+func MakeWsData(ID, Data string) {
+
 	if !strings.Contains(Data, "||||") {
-		data := strings.Join([]string{Data, "数据格式错误"}, "----")
-		SendMessageToWs(m, ID, "error", data)
+		// 优化：使用 Sprintf 替代 Join，可读性更好
+		data := fmt.Sprintf("%s----数据格式错误", Data)
+		Manager.SendMessageToWs(ID, "error", data)
 	} else {
 		dataSplit := strings.Split(Data, "||||")
+		if len(dataSplit) < 3 {
+			Manager.SendMessageToWs(ID, "error", "数据参数不足")
+			return
+		}
+
 		name := dataSplit[0]
 		uri := dataSplit[1]
 		Version := dataSplit[2]
-		CurrentPath, _ := GetCurrentPath()
-		dataPath := strings.Join([]string{CurrentPath, "data"}, "/")
-		tmpPath := strings.Join([]string{CurrentPath, "tmp"}, "/")
-		CorePath := strings.Join([]string{CurrentPath, "Core"}, "/")
-		CoreFile := strings.Join([]string{CorePath, name}, "/")
-		// fmt.Println(CoreFile)
+
+		CurrentPath, _ := utils.GetCurrentPath()
+		// 优化：使用标准库 path/filepath 处理路径
+		dataPath := filepath.Join(CurrentPath, "data")
+		tmpPath := filepath.Join(CurrentPath, "tmp")
+		CorePath := filepath.Join(CurrentPath, "Core")
+		CoreFile := filepath.Join(CorePath, name)
+
 		createDirectoryIfNotExists(tmpPath)
-		filePath := strings.Join([]string{tmpPath, name}, "/")
-		DownloadFileWithHeaders(uri, filePath, ID, name, CoreFile, dataPath, Version, m)
+		filePath := filepath.Join(tmpPath, name)
+
+		// 注意：DownloadFileWithHeaders 最后一个参数也要改为 h (*WebSocketHandler)
+		DownloadFileWithHeaders(uri, filePath, ID, name, CoreFile, dataPath, Version)
 	}
 }

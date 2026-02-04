@@ -1,15 +1,13 @@
-package datafactory
+package websocket
 
 import (
-	"encoding/json"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	config "xpanel/Config"
 
-	"github.com/olahol/melody"
 	"golang.org/x/net/proxy"
 )
 
@@ -46,7 +44,7 @@ func TestData(u string) bool {
 }
 
 // SyncCheckData
-func SyncCheckData(m *melody.Melody, ID string) {
+func SyncCheckData(ID string) {
 	var wg sync.WaitGroup
 	for i := 0; i < len(list); i++ {
 		i0 := i
@@ -60,13 +58,8 @@ func SyncCheckData(m *melody.Melody, ID string) {
 			if res {
 				speed = TimeElapsedStr
 			}
-			speeData := &config.Message{
-				Type: "testspeed",
-				UUID: ID,
-				Data: strings.Join([]string{list[i0], speed}, "||||"),
-			}
-			sedData, _ := json.Marshal(speeData)
-			m.Broadcast(sedData)
+			Data := strings.Join([]string{list[i0], speed}, "||||")
+			Manager.SendMessageToWs(ID, "testspeed", Data)
 			wg.Done()
 		}()
 	}
@@ -75,4 +68,21 @@ func SyncCheckData(m *melody.Melody, ID string) {
 
 func Float64ToStringWithPrecision(value float64, precision int) string {
 	return strconv.FormatFloat(value, 'f', precision, 64)
+}
+
+func TCPing(host string, port string) (time.Duration, error) {
+	timeout := 5 * time.Second
+	address := strings.Join([]string{host, port}, ":")
+
+	startTime := time.Now()
+	conn, err := net.DialTimeout("tcp", address, timeout)
+	if err != nil {
+		return 0, err
+	}
+
+	defer conn.Close()
+
+	elapsedTime := time.Since(startTime)
+
+	return elapsedTime, nil
 }

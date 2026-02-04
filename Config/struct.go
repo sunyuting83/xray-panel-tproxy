@@ -176,16 +176,6 @@ type Configs struct {
 	Current           string   `json:"current"`
 }
 
-type GopherInfo struct {
-	ID string
-}
-
-type Message struct {
-	Type string `json:"type"`
-	UUID string `json:"uuid"`
-	Data string `json:"data"`
-}
-
 type JSONData struct {
 	URL       string `json:"url"`
 	AssetsURL string `json:"assets_url"`
@@ -270,4 +260,16 @@ type JSONData struct {
 		Eyes       int    `json:"eyes"`
 	} `json:"reactions"`
 	MentionsCount int `json:"mentions_count"`
+}
+
+// GopherInfo 存储每个 WebSocket 连接的上下文信息
+type GopherInfo struct {
+	ID string `json:"id"`
+}
+
+// Message 是前后端通信的标准 JSON 协议结构
+type Message struct {
+	Type string `json:"type"` // 消息类型: message, download, testspeed, tcping, active, error 等
+	UUID string `json:"uuid"` // 发送者或接收者的唯一标识
+	Data string `json:"data"` // 核心数据内容（字符串格式，内部可能包含 |||| 分隔符）
 }

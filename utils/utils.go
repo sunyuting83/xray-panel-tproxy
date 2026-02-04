@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,17 +17,74 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	config "xpanel/Config"
 	datafactory "xpanel/DataFactory"
 
 	"github.com/gin-gonic/gin"
-	"github.com/olahol/melody"
+	"golang.org/x/net/proxy"
 )
 
 type Auths struct {
 	User     string `json:"user"`
 	Password string `json:"pass"`
+}
+
+func GetData(u string, p bool) (s []byte, err error) {
+	client := &http.Client{
+		Timeout: time.Duration(15 * time.Second),
+	}
+	if p {
+		dialer, err := proxy.SOCKS5("tcp", "localhost:7891", nil, proxy.Direct)
+		if err != nil {
+			return []byte(""), err
+		}
+		client = &http.Client{
+			Timeout:   time.Duration(15 * time.Second),
+			Transport: &http.Transport{Dial: dialer.Dial},
+		}
+	}
+	reqest, err := http.NewRequest("GET", u, nil)
+
+	reqest.Header.Set("Accept", "application/json, text/javascript, */*; q=0.01")
+	reqest.Header.Set("Content-Type", "application/json")
+	reqest.Header.Set("X-Requested-With", "XMLHttpRequest")
+	reqest.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36")
+
+	if err != nil {
+		return []byte(""), err
+	}
+	response, err := client.Do(reqest)
+	if err != nil {
+		return []byte(""), err
+	}
+	defer response.Body.Close()
+	d, err := io.ReadAll(response.Body)
+	if err != nil {
+		return []byte(""), err
+	}
+	return d, nil
+}
+
+// SyncGetData get data
+func SyncGetData(list []string, porxy bool) (d []string) {
+	var wg sync.WaitGroup
+	d = []string{}
+	for i := 0; i < len(list); i++ {
+		i0 := i
+		wg.Add(1)
+		go func() {
+			res, errers := GetData(list[i0], porxy)
+			if errers != nil {
+				d = append(d, "")
+			}
+			d = append(d, string(res))
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	return
 }
 
 // CORSMiddleware cors middleware
@@ -49,17 +105,6 @@ func CORSMiddleware() gin.HandlerFunc {
 		}
 		c.Next()
 	}
-}
-
-// checkType check type
-func checkType(a string) (c bool) {
-	l := []string{"vless", "ss", "vmess", "ssr", "trojan"}
-	for _, item := range l {
-		if item == a {
-			return true
-		}
-	}
-	return false
 }
 
 // GetCurrentPath Get Current Path
@@ -149,26 +194,6 @@ func RemoveRepeatedElement(personList []*config.CodeList) (result []*config.Code
 		if !repeat {
 			if personList[i].Port != 0 {
 				result = append(result, personList[i])
-			}
-		}
-	}
-	return
-}
-
-// makeDates make dates
-func MakeDates(a []string) (b []*config.CodeList) {
-	for _, v := range a {
-		list := strings.Split(DeCodeBytes(v), "\n")
-		for _, item := range list {
-			if len(item) > 0 {
-				if strings.Contains(item, "://") {
-					a := strings.Split(item, "://")
-					t := a[0]
-					n := a[1]
-					if checkType(t) {
-						b = append(b, datafactory.MakeDate(t, n))
-					}
-				}
 			}
 		}
 	}
@@ -1135,7 +1160,7 @@ func GetVersionData(ProxyUri []string, VersionUrl, CoreZip string, geo, proxy bo
 		if item == "" {
 			uri = VersionUrl
 		}
-		data, err := datafactory.GetData(uri, proxy)
+		data, err := GetData(uri, proxy)
 		if err == nil {
 			var (
 				index int = len(data)
@@ -1175,7 +1200,7 @@ func GetVersionMD5(ProxyUri []string, MD5uri string) (string, error) {
 	var md5 string = ""
 	for _, item := range ProxyUri {
 		uri := strings.Join([]string{item, MD5uri}, "")
-		data, err := datafactory.GetData(uri, false)
+		data, err := GetData(uri, false)
 		if err == nil {
 			dataSplit := strings.Split(string(data), "\n")
 			for _, v := range dataSplit {
@@ -1213,49 +1238,37 @@ func Decimal(num float64) float64 {
 	floatNum, _ := strconv.ParseFloat(res, 64)
 	return floatNum
 }
-
-func TestTCPing(m *melody.Melody, ID string) {
-	current_path, _ := GetCurrentPath()
-	jsonFile := strings.Join([]string{current_path, "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	list := ListToJsons(data)
-	if len(*list) > 0 {
-		for i, item := range *list {
-			port := strconv.Itoa(item.Port)
-			index := strconv.Itoa(i)
-			elapsedTime, err := TCPing(item.Address, port)
-			speed := "0"
-			if err == nil {
-				speed = Float64ToStringWithPrecision(elapsedTime.Seconds()*1000, 2)
-			}
-			speeData := &config.Message{
-				Type: "tcping",
-				UUID: ID,
-				Data: strings.Join([]string{index, speed}, "||||"),
-			}
-			sedData, _ := json.Marshal(speeData)
-			m.Broadcast(sedData)
-		}
-	}
-}
-
 func Float64ToStringWithPrecision(value float64, precision int) string {
 	return strconv.FormatFloat(value, 'f', precision, 64)
 }
 
-func TCPing(host string, port string) (time.Duration, error) {
-	timeout := 5 * time.Second
-	address := strings.Join([]string{host, port}, ":")
-
-	startTime := time.Now()
-	conn, err := net.DialTimeout("tcp", address, timeout)
-	if err != nil {
-		return 0, err
+// checkType check type
+func checkType(a string) (c bool) {
+	l := []string{"vless", "ss", "vmess", "ssr", "trojan"}
+	for _, item := range l {
+		if item == a {
+			return true
+		}
 	}
+	return false
+}
 
-	defer conn.Close()
-
-	elapsedTime := time.Since(startTime)
-
-	return elapsedTime, nil
+// makeDates make dates
+func MakeDates(a []string) (b []*config.CodeList) {
+	for _, v := range a {
+		list := strings.Split(DeCodeBytes(v), "\n")
+		for _, item := range list {
+			if len(item) > 0 {
+				if strings.Contains(item, "://") {
+					a := strings.Split(item, "://")
+					t := a[0]
+					n := a[1]
+					if checkType(t) {
+						b = append(b, datafactory.MakeDate(t, n))
+					}
+				}
+			}
+		}
+	}
+	return
 }

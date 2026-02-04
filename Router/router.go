@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 	config "xpanel/Config"
-	datafactory "xpanel/DataFactory"
 	"xpanel/utils"
 
+	"xpanel/websocket"
+
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/olahol/melody"
+	"github.com/lxzan/gws"
 )
 
 // SetConfigMiddleWare set config
@@ -40,7 +40,7 @@ func UpData(c *gin.Context) {
 	if Proxy != "0" {
 		proxy = true
 	}
-	data := datafactory.SyncGetData(urlList, proxy)
+	data := utils.SyncGetData(urlList, proxy)
 	if len(data) > 0 {
 		base := utils.MakeDates(data)
 		datas := utils.IgnoreTag(base, string(ignore))
@@ -317,7 +317,7 @@ func TestProxy(c *gin.Context) {
 		return
 	}
 	start := time.Now()
-	_, err := datafactory.GetData(form.Uri, true)
+	_, err := utils.GetData(form.Uri, true)
 	timeElapsed := time.Since(start)
 
 	TimeElapsed := utils.Decimal(timeElapsed.Seconds())
@@ -432,7 +432,8 @@ func Index(c *gin.Context) {
 // InitRouter make router
 func InitRouter(CurrentPath string) *gin.Engine {
 	router := gin.New()
-	m := melody.New()
+	// 初始化 gws Upgrader
+	upgrader := gws.NewUpgrader(websocket.Manager, &gws.ServerOption{})
 	router.Use(utils.CORSMiddleware())
 	router.StaticFS("/static/css", http.Dir("static/static/css"))
 	router.StaticFS("/static/js", http.Dir("static/static/js"))
@@ -440,66 +441,11 @@ func InitRouter(CurrentPath string) *gin.Engine {
 	router.LoadHTMLGlob("static/index.html")
 
 	router.GET("/ws", func(c *gin.Context) {
-		m.HandleRequest(c.Writer, c.Request)
-	})
-	m.HandleConnect(func(s *melody.Session) {
-		ss, _ := m.Sessions()
-
-		for _, o := range ss {
-			value, exists := o.Get("info")
-
-			if !exists {
-				continue
-			}
-
-			info := value.(*config.GopherInfo)
-
-			firstData := &config.Message{
-				Type: "message",
-				UUID: info.ID,
-				Data: "first connect",
-			}
-			sedData, _ := json.Marshal(firstData)
-			s.Write([]byte(sedData))
-		}
-
-		id := uuid.NewString()
-		s.Set("info", &config.GopherInfo{ID: id})
-		firstData := &config.Message{
-			Type: "message",
-			UUID: id,
-			Data: "first connect",
-		}
-		sedData, _ := json.Marshal(firstData)
-		s.Write([]byte(sedData))
-	})
-
-	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		var message *config.Message
-		err := json.Unmarshal(msg, &message)
-		value, exists := s.Get("info")
-
-		if err != nil || !exists {
+		conn, err := upgrader.Upgrade(c.Writer, c.Request)
+		if err != nil {
 			return
 		}
-		info := value.(*config.GopherInfo)
-		if message.Type == "download" {
-			utils.MakeWsData(m, info.ID, message.Data)
-		}
-		if message.UUID == info.ID {
-			switch message.Type {
-			case "message":
-				m.Broadcast(msg)
-			case "testspeed":
-				datafactory.SyncCheckData(m, message.UUID)
-			case "tcping":
-				utils.TestTCPing(m, message.UUID)
-			case "active":
-				break
-			default:
-				m.Broadcast(msg)
-			}
-		}
+		go conn.ReadLoop()
 	})
 
 	api := router.Group("/api")
