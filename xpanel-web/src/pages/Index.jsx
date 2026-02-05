@@ -1,96 +1,121 @@
-import { useState, useEffect } from 'react'
-import {urilist, httpServer} from '../utils/index'
-import Loading from '../public/Loading'
-import { useWsContext } from '../public/ws'
+import { useState, useEffect, useRef } from 'react';
+import { urilist, httpServer } from '../utils/index';
+import Loading from '../public/Loading';
+import { useWsContext } from '../public/ws';
 
 const Index = () => {
-  const [status, setStatus] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [ggstatus, setGgstatus] = useState(true)
-  const [ggtime, setGgtime] = useState(0)
-  const [bdstatus, setBdstatus] = useState(true)
-  const [bdtime, setBdtime] = useState(0)
-  const [ytstatus, setYtstatus] = useState(true)
-  const [yttime, setYttime] = useState(0)
-  const [ghstatus, setGhstatus] = useState(true)
-  const [ghtime, setGhtime] = useState(0)
-  const [current, setCurrent] = useState("未设定")
-  const globalWs = useWsContext()
-  useEffect(() => {
-    const wsuuid = localStorage.getItem("uuid")
-    globalWs.onmessage = (data) => {
-      if (typeof JSON.parse(data.data) === "object") {
-        const jsonData = JSON.parse(data.data)
-        if (jsonData.type === "testspeed") {
-          if (jsonData.data.indexOf('||||') !== -1) {
-            const splitData = jsonData.data.split("||||")
-            const speedNumber = parseFloat(splitData[1])
-            switch (splitData[0]) {
-              case 'https://www.google.com.hk':
-                if (speedNumber > 0) {
-                  setGgtime(speedNumber)
-                }
-                setGgstatus(false)
-                break;
-              case 'https://baidu.com':
-                if (speedNumber > 0) {
-                  setBdtime(speedNumber)
-                }
-                setBdstatus(false)
-                break;
-              case 'https://www.youtube.com/img/desktop/yt_1200.png':
-                if (speedNumber > 0) {
-                  setYttime(speedNumber)
-                }
-                setYtstatus(false)
-                break;
-              case 'https://github.com/webgl-globe/data/data.json':
-                if (speedNumber > 0) {
-                  setGhtime(speedNumber)
-                }
-                setGhstatus(false)
-                break;
-              
-              default:
-                break;
-            }
-          }
+  const [status, setStatus] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [ggstatus, setGgstatus] = useState(true);
+  const [ggtime, setGgtime] = useState(0);
+  const [bdstatus, setBdstatus] = useState(true);
+  const [bdtime, setBdtime] = useState(0);
+  const [ytstatus, setYtstatus] = useState(true);
+  const [yttime, setYttime] = useState(0);
+  const [ghstatus, setGhstatus] = useState(true);
+  const [ghtime, setGhtime] = useState(0);
+  const [current, setCurrent] = useState("未设定");
+
+  const { sendMessage, status: wsstatus, addListener, removeListener } = useWsContext();
+
+  // --- 关键重构：使用 Ref 解决闭包陷阱 ---
+  const logicRef = useRef();
+
+  // 每次渲染都更新 Ref，确保 handleMessage 逻辑永远是最新的
+  logicRef.current = (event) => {
+    try {
+      const jsonData = JSON.parse(event.data);
+      if (jsonData.type === "testspeed" && jsonData.data.includes('||||')) {
+        const [url, speedStr] = jsonData.data.split("||||");
+        const speedNumber = parseFloat(speedStr);
+
+        switch (url) {
+          case 'https://www.google.com.hk':
+            if (speedNumber > 0) setGgtime(speedNumber);
+            setGgstatus(false);
+            break;
+          case 'https://baidu.com':
+            if (speedNumber > 0) setBdtime(speedNumber);
+            setBdstatus(false);
+            break;
+          case 'https://www.youtube.com/img/desktop/yt_1200.png':
+            if (speedNumber > 0) setYttime(speedNumber);
+            setYtstatus(false);
+            break;
+          case 'https://github.com/webgl-globe/data/data.json':
+            if (speedNumber > 0) setGhtime(speedNumber);
+            setGhstatus(false);
+            break;
+          default:
+            break;
         }
       }
+    } catch (e) {
+      console.error("解析失败", e);
     }
-    const sendData = JSON.stringify({'type': 'testspeed', 'uuid': wsuuid, 'data': 'active'})
-    if (globalWs.readyState === 1) globalWs.send(sendData)
+  };
+
+  useEffect(() => {
+    // 一个稳定的桥接函数，它不依赖组件状态，只调用 Ref
+    const bridge = (e) => logicRef.current?.(e);
+
+    // 绑定监听器
+    addListener(bridge);
+
+    // 发送初始测速请求
+    if (wsstatus === 'OPEN') {
+      sendMessage({
+        type: 'testspeed',
+        uuid: localStorage.getItem("uuid"),
+        data: 'active'
+      });
+    }
+
+    // 获取 HTTP 状态
     async function getData() {
-      const d = await httpServer(urilist.getstatus)
-      if (d.status === 0) {
-        setStatus(true)
-        setCurrent(d.current)
-        localStorage.setItem('current', d.current)
-      }else{
-        setStatus(false)
+      try {
+        const d = await httpServer(urilist.getstatus);
+        if (d?.status === 0) {
+          setStatus(true);
+          setCurrent(d.current);
+          localStorage.setItem('current', d.current);
+        } else {
+          setStatus(false);
+        }
+      } catch (err) {
+        console.error("HTTP获取失败", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false)
     }
-    getData()
-  }, [globalWs])
-  const StatusTime = (timestamp) => {
-    if (timestamp > 0) {
-      return `用时: ${timestamp}秒`
-    }else{
-      return "测试失败"
-    }
+    getData();
+
+    // 清理：组件销毁时移除监听
+    return () => {
+      removeListener(bridge);
+    };
+  }, [wsstatus, sendMessage, addListener, removeListener]); // 移除 globalWs 依赖
+
+  // 处理 WS 连接中的状态
+  if (wsstatus !== 'OPEN') {
+    return <Loading />;
   }
+
+  const StatusTime = (timestamp) => {
+    return timestamp > 0 ? `用时: ${timestamp}秒` : "测试失败";
+  };
+
   return (
     <>
-      {
-        loading ? <Loading /> : 
+      {loading ? <Loading /> : (
         <div className="tile is-ancestor mt-3">
+          {/* ... 你的渲染内容保持不变 ... */}
           <div className="tile is-vertical is-8">
             <div className="tile">
               <div className="tile is-parent is-vertical">
                 <article className={"tile is-child notification" + (status ? " is-primary" : " is-danger")}>
                   <p className="title">状态：</p>
-                  <p className="subtitle">{status? "运行中" : "未运行"}</p>
+                  <p className="subtitle">{status ? "运行中" : "未运行"}</p>
                   <p>当前节点：{current}</p>
                 </article>
                 <article className="tile is-child notification is-warning">
@@ -102,8 +127,6 @@ const Index = () => {
                 <article className="tile is-child notification is-info">
                   <p className="title">百度</p>
                   <p className="subtitle">{bdstatus ? "loading..." : StatusTime(bdtime)}</p>
-                  <figure className="image is-4by3">
-                  </figure>
                 </article>
               </div>
             </div>
@@ -111,8 +134,6 @@ const Index = () => {
               <article className="tile is-child notification is-danger">
                 <p className="title">Youtube</p>
                 <p className="subtitle">{ytstatus ? "loading..." : StatusTime(yttime)}</p>
-                <div className="content">
-                </div>
               </article>
             </div>
           </div>
@@ -121,14 +142,13 @@ const Index = () => {
               <div className="content">
                 <p className="title">Github</p>
                 <p className="subtitle">{ghstatus ? "loading..." : StatusTime(ghtime)}</p>
-                <div className="content">
-                </div>
               </div>
             </article>
           </div>
         </div>
-      }
+      )}
     </>
-  )
-}
-export default Index
+  );
+};
+
+export default Index;

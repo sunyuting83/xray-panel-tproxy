@@ -1,6 +1,6 @@
 import { httpServer } from './http'
 const Rooturi = window.location.origin + '/'
-// const Rooturi = "http://localhost:13005/"
+// const Rooturi = "http://192.168.51.253:13005/"
 // console.log(Rooturi)
 const urilist = {
   'nodelist': `${Rooturi}api/nodelist`,
