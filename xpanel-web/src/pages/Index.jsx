@@ -1,77 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useCallback, useState } from 'react'
+import { useWsContext } from '../public/ws'
+import { useSpeedTestHandler } from '../hooks/useSpeedTestHandler'
+import Loading from '../public/Loading'
 import { urilist, httpServer } from '../utils/index';
-import Loading from '../public/Loading';
-import { useWsContext } from '../public/ws';
 
 const Index = () => {
-  const [status, setStatus] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [ggstatus, setGgstatus] = useState(true);
-  const [ggtime, setGgtime] = useState(0);
-  const [bdstatus, setBdstatus] = useState(true);
-  const [bdtime, setBdtime] = useState(0);
-  const [ytstatus, setYtstatus] = useState(true);
-  const [yttime, setYttime] = useState(0);
-  const [ghstatus, setGhstatus] = useState(true);
-  const [ghtime, setGhtime] = useState(0);
-  const [current, setCurrent] = useState("未设定");
+  const [custatus, setStatus] = useState(false)
+  const [current, setCurrent] = useState("未设定")
+  // 从自定义 Hook 中获取状态和处理函数
+  const { speedState, handleSpeedMessage } = useSpeedTestHandler()
+  // 从 Context 中获取 WebSocket 实例和状态
+  const { ws: globalWs, sendMessage, status, addListener, removeListener } = useWsContext()
 
-  const { sendMessage, status: wsstatus, addListener, removeListener } = useWsContext();
-
-  // --- 关键重构：使用 Ref 解决闭包陷阱 ---
-  const logicRef = useRef();
-
-  // 每次渲染都更新 Ref，确保 handleMessage 逻辑永远是最新的
-  logicRef.current = (event) => {
-    try {
-      const jsonData = JSON.parse(event.data);
-      if (jsonData.type === "testspeed" && jsonData.data.includes('||||')) {
-        const [url, speedStr] = jsonData.data.split("||||");
-        const speedNumber = parseFloat(speedStr);
-
-        switch (url) {
-          case 'https://www.google.com.hk':
-            if (speedNumber > 0) setGgtime(speedNumber);
-            setGgstatus(false);
-            break;
-          case 'https://baidu.com':
-            if (speedNumber > 0) setBdtime(speedNumber);
-            setBdstatus(false);
-            break;
-          case 'https://www.youtube.com/img/desktop/yt_1200.png':
-            if (speedNumber > 0) setYttime(speedNumber);
-            setYtstatus(false);
-            break;
-          case 'https://github.com/webgl-globe/data/data.json':
-            if (speedNumber > 0) setGhtime(speedNumber);
-            setGhstatus(false);
-            break;
-          default:
-            break;
-        }
-      }
-    } catch (e) {
-      console.error("解析失败", e);
-    }
-  };
-
-  useEffect(() => {
-    // 一个稳定的桥接函数，它不依赖组件状态，只调用 Ref
-    const bridge = (e) => logicRef.current?.(e);
-
-    // 绑定监听器
-    addListener(bridge);
-
-    // 发送初始测速请求
-    if (wsstatus === 'OPEN') {
+  // 定义测速辅助函数
+  const runSpeedTest = useCallback(() => {
+    if (status === 'OPEN') {
+      const wsuuid = localStorage.getItem("uuid")
       sendMessage({
         type: 'testspeed',
-        uuid: localStorage.getItem("uuid"),
+        uuid: wsuuid,
         data: 'active'
-      });
+      })
     }
+  }, [status, sendMessage])
 
-    // 获取 HTTP 状态
+  useEffect(() => {
+    if (!globalWs) return
+
+     // 获取 HTTP 状态
     async function getData() {
       try {
         const d = await httpServer(urilist.getstatus);
@@ -84,71 +40,102 @@ const Index = () => {
         }
       } catch (err) {
         console.error("HTTP获取失败", err);
-      } finally {
-        setLoading(false);
       }
     }
     getData();
 
-    // 清理：组件销毁时移除监听
-    return () => {
-      removeListener(bridge);
-    };
-  }, [wsstatus, sendMessage, addListener, removeListener]); // 移除 globalWs 依赖
+    // 绑定监听：收到消息时交给 Hook 处理
+    const bridge = (e) => handleSpeedMessage(e)
+    addListener(bridge)
 
-  // 处理 WS 连接中的状态
-  if (wsstatus !== 'OPEN') {
-    return <Loading />;
+    // 如果 WS 已经连接，加载页面时直接运行一次测速
+    if (status === 'OPEN') {
+      runSpeedTest()
+    }
+
+    return () => {
+      // 卸载时移除监听
+      removeListener(bridge)
+    }
+  }, [globalWs, status, addListener, removeListener, handleSpeedMessage, runSpeedTest])
+
+  // 辅助渲染：格式化显示时间
+  const renderTime = (time, loadingStatus) => {
+    if (loadingStatus) return <span className="tag is-light">检测中...</span>
+    return time > 0 ? (
+      <span className="tag is-success is-light">{time}s</span>
+    ) : (
+      <span className="tag is-danger is-light">超时/失败</span>
+    )
   }
 
-  const StatusTime = (timestamp) => {
-    return timestamp > 0 ? `用时: ${timestamp}秒` : "测试失败";
-  };
-
   return (
-    <>
-      {loading ? <Loading /> : (
-        <div className="tile is-ancestor mt-3">
-          {/* ... 你的渲染内容保持不变 ... */}
-          <div className="tile is-vertical is-8">
-            <div className="tile">
-              <div className="tile is-parent is-vertical">
-                <article className={"tile is-child notification" + (status ? " is-primary" : " is-danger")}>
-                  <p className="title">状态：</p>
-                  <p className="subtitle">{status ? "运行中" : "未运行"}</p>
-                  <p>当前节点：{current}</p>
-                </article>
-                <article className="tile is-child notification is-warning">
-                  <p className="title">Google</p>
-                  <p className="subtitle">{ggstatus ? "loading..." : StatusTime(ggtime)}</p>
-                </article>
+    <div className="container mt-5">
+      <article className={"tile is-child notification" + (custatus ? " is-primary" : " is-danger")}>
+        <p className="title">状态：</p>
+        <p className="subtitle">{custatus ? "运行中" : "未运行"}</p>
+        <p>当前节点：{current}</p>
+      </article>
+      <div className="columns is-multiline">
+        {/* 测速卡片展示 */}
+        <div className="column is-12">
+          <div className="box">
+            <div className="level">
+              <div className="level-left">
+                <h3 className="title is-4">网络连通性状态</h3>
               </div>
-              <div className="tile is-parent">
-                <article className="tile is-child notification is-info">
-                  <p className="title">百度</p>
-                  <p className="subtitle">{bdstatus ? "loading..." : StatusTime(bdtime)}</p>
-                </article>
+              <div className="level-right">
+                <button 
+                  className={`button is-info is-small ${status !== 'OPEN' ? 'is-loading' : ''}`} 
+                  onClick={runSpeedTest}
+                  disabled={status !== 'OPEN'}
+                >
+                  重新测试
+                </button>
               </div>
             </div>
-            <div className="tile is-parent">
-              <article className="tile is-child notification is-danger">
-                <p className="title">Youtube</p>
-                <p className="subtitle">{ytstatus ? "loading..." : StatusTime(yttime)}</p>
-              </article>
-            </div>
-          </div>
-          <div className="tile is-parent">
-            <article className="tile is-child notification is-success">
-              <div className="content">
-                <p className="title">Github</p>
-                <p className="subtitle">{ghstatus ? "loading..." : StatusTime(ghtime)}</p>
+
+            <div className="columns is-mobile is-multiline">
+              <div className="column is-half-mobile is-one-quarter-desktop">
+                <div className="notification is-white has-text-centered border-light">
+                  <p className="heading">百度 (Baidu)</p>
+                  <p className="title is-5">{renderTime(speedState.bdtime, speedState.bdstatus)}</p>
+                </div>
               </div>
-            </article>
+              
+              <div className="column is-half-mobile is-one-quarter-desktop">
+                <div className="notification is-white has-text-centered border-light">
+                  <p className="heading">谷歌 (Google)</p>
+                  <p className="title is-5">{renderTime(speedState.ggtime, speedState.ggstatus)}</p>
+                </div>
+              </div>
+
+              <div className="column is-half-mobile is-one-quarter-desktop">
+                <div className="notification is-white has-text-centered border-light">
+                  <p className="heading">GitHub</p>
+                  <p className="title is-5">{renderTime(speedState.ghtime, speedState.ghstatus)}</p>
+                </div>
+              </div>
+
+              <div className="column is-half-mobile is-one-quarter-desktop">
+                <div className="notification is-white has-text-centered border-light">
+                  <p className="heading">YouTube</p>
+                  <p className="title is-5">{renderTime(speedState.yttime, speedState.ytstatus)}</p>
+                </div>
+              </div>
+            </div>
+            
+            <p className="is-size-7 has-text-grey mt-3">
+              * 测速基于当前已激活的节点。如果测试全部失败，请检查节点是否可用。
+            </p>
           </div>
         </div>
-      )}
-    </>
-  );
-};
+      </div>
+      
+      {/* 如果 WS 连接还没准备好，可以显示一个小的加载提示 */}
+      {status !== 'OPEN' && <Loading />}
+    </div>
+  )
+}
 
-export default Index;
+export default Index

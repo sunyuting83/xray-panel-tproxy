@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 
 const WsContext = createContext();
 
@@ -10,7 +10,8 @@ export const WsProvider = ({ children }) => {
   const reconnectCount = useRef(0);
   const wsRef = useRef(null);
 
-  const connect = () => {
+  // 1. 使用 useCallback 包裹 connect，确保其引用地址稳定
+  const connect = useCallback(() => {
     // 防止重复连接
     if (globalInstance && (globalInstance.readyState === WebSocket.OPEN || globalInstance.readyState === WebSocket.CONNECTING)) {
       return;
@@ -18,6 +19,7 @@ export const WsProvider = ({ children }) => {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUri = `${protocol}//${window.location.host}/ws`;
+    // const wsUri = `${protocol}//192.168.51.253:13005/ws`;
     const socket = new WebSocket(wsUri);
 
     socket.onopen = () => {
@@ -40,16 +42,17 @@ export const WsProvider = ({ children }) => {
       const delay = Math.min(1000 * 2 ** reconnectCount.current, 30000);
       setTimeout(() => {
         reconnectCount.current++;
-        connect();
+        connect(); // 这里会安全地引用 useCallback 包裹后的函数
       }, delay);
     };
 
     globalInstance = socket;
     wsRef.current = socket;
-  };
+  }, []); // 依赖项为空，确保 connect 函数永远不会变
 
   useEffect(() => {
     connect();
+    
     const heartbeat = setInterval(() => {
       if (globalInstance?.readyState === WebSocket.OPEN) {
         const uuid = localStorage.getItem("uuid");
@@ -58,7 +61,7 @@ export const WsProvider = ({ children }) => {
     }, 1000 * 60 * 5);
 
     return () => clearInterval(heartbeat);
-  }, []);
+  }, [connect]); // ✅ 现在 connect 已经稳定且加入了依赖数组，警告消失
 
   // 包装稳定的发送函数
   const sendMessage = (data) => {
@@ -68,11 +71,9 @@ export const WsProvider = ({ children }) => {
   };
 
   const value = {
-    // 导出实例和方法
     ws: globalInstance,
     status,
     sendMessage,
-    // 专家建议：直接通过 globalInstance 操作，避免 context 刷新导致的引用丢失
     addListener: (cb) => globalInstance?.addEventListener('message', cb),
     removeListener: (cb) => globalInstance?.removeEventListener('message', cb),
   };
