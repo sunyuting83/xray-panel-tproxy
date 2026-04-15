@@ -755,10 +755,10 @@ func SetVmess(j *config.CodeList, p string) (b bool) {
 			tls := "none"
 			if j.TLS {
 				tls = "tls"
+				streamSettings.(map[string]interface{})["tlsSettings"].(map[string]interface{})["allowInsecure"] = true
 			}
 			streamSettings.(map[string]interface{})["security"] = tls
-			streamSettings.(map[string]interface{})["wsSettings"].(map[string]interface{})["headers"].(map[string]interface{})["Host"] = j.Host
-			streamSettings.(map[string]interface{})["wsSettings"].(map[string]interface{})["path"] = j.Path
+			streamSettings.(map[string]interface{})["tlsSettings"].(map[string]interface{})["serverName"] = j.Host
 		}
 	}
 	saveData, _ := json.Marshal(m)

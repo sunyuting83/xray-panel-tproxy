@@ -10,14 +10,15 @@ import (
 // TrojanToJSON ss Json
 func TrojanToJSON(a string) (j *config.CodeList) {
 	var (
-		address  string
-		port     int
-		password string
-		title    string
-		host     string
-		a1       []string
-		a2       []string
-		a3       []string
+		address       string
+		port          int
+		password      string
+		title         string
+		host          string
+		allowInsecure bool = false
+		a1            []string
+		a2            []string
+		a3            []string
 	)
 	title = "默认节点"
 	if strings.Contains(a, "#") {
@@ -46,6 +47,9 @@ func TrojanToJSON(a string) (j *config.CodeList) {
 		} else {
 			host = address
 		}
+		if strings.Contains(a4[1], "allowInsecure=1") {
+			allowInsecure = true
+		}
 	} else {
 		a2 = strings.Split(a1[0], "@")
 		a3 = strings.Split(a2[1], ":")
@@ -62,6 +66,7 @@ func TrojanToJSON(a string) (j *config.CodeList) {
 		Port:     port,
 		Password: password,
 		Host:     host,
+		TLS:      allowInsecure,
 	}
 	return
 }
