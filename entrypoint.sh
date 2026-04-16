@@ -1,62 +1,49 @@
 #!/bin/sh
-
 set -e
 
 check_and_delete_rule() {
-    # Run ip rule show and check if fwmark 0x1 is in the output
-    if ip rule show | grep -q "fwmark 0x1"; then
-        # If fwmark 0x1 is present, delete the rule and route
-        echo "Deleting rule and route..."
+    if ip rule show | grep -q "fwmark 0x1 lookup 100"; then
         ip rule delete fwmark 1 table 100
         ip route delete local default dev lo table 100
+    fi
+    if ip -6 rule show | grep -q "fwmark 0x1 lookup 106"; then
         ip -6 rule delete fwmark 1 table 106
         ip -6 route delete local ::/0 dev lo table 106
-    else
-        echo "Rule not found. Nothing to delete."
     fi
 }
 
-# 调用函数
-
-
 reset_iptables(){
+    echo "Resetting iptables rules..."
     check_and_delete_rule
-    ip rule add fwmark 1 table 100
-    ip route add local default dev lo table 100
-    ip -6 rule add fwmark 1 table 106
-    ip -6 route add local ::/0 dev lo table 106
-    iptables -P INPUT ACCEPT
-    iptables -P FORWARD ACCEPT
-    iptables -P OUTPUT ACCEPT
-    iptables -t nat -F
-    iptables -t mangle -F
-    iptables -t mangle -X
-    iptables -t mangle -Z
-    iptables -F
-    iptables -X
-    ip6tables-nft -P INPUT ACCEPT
-    ip6tables-nft -P FORWARD ACCEPT
-    ip6tables-nft -P OUTPUT ACCEPT
-    ip6tables-nft -t nat -F
-    ip6tables-nft -t mangle -F
-    ip6tables-nft -t mangle -X
-    ip6tables-nft -t mangle -Z
-    ip6tables-nft -F
-    ip6tables-nft -X
+
+    iptables -t mangle -D PREROUTING -j XRAY 2>/dev/null || true
+    iptables -t mangle -D PREROUTING -p tcp -m socket -j DIVERT 2>/dev/null || true
+    iptables -t mangle -F XRAY 2>/dev/null || true
+    iptables -t mangle -X XRAY 2>/dev/null || true
+    iptables -t mangle -F DIVERT 2>/dev/null || true
+    iptables -t mangle -X DIVERT 2>/dev/null || true
+
+    ip6tables-nft -t mangle -D PREROUTING -j XRAY6_MASK 2>/dev/null || true
+    ip6tables-nft -t mangle -D PREROUTING -p tcp -m socket -j DIVERT 2>/dev/null || true
+    ip6tables-nft -t mangle -F XRAY6_MASK 2>/dev/null || true
+    ip6tables-nft -t mangle -X XRAY6_MASK 2>/dev/null || true
+    ip6tables-nft -t mangle -F DIVERT 2>/dev/null || true
+    ip6tables-nft -t mangle -X DIVERT 2>/dev/null || true
 }
 
 set_xray_iptables(){
+    echo "Setting up Xray iptables rules..."
+
+    ip rule add fwmark 1 table 100 2>/dev/null || true
+    ip route add local default dev lo table 100 2>/dev/null || true
+    ip -6 rule add fwmark 1 table 106 2>/dev/null || true
+    ip -6 route add local ::/0 dev lo table 106 2>/dev/null || true
+
     iptables -t mangle -N XRAY
-    iptables -t mangle -A XRAY -d 10.0.0.0/8 -j RETURN
-    iptables -t mangle -A XRAY -d 100.64.0.0/10 -j RETURN
     iptables -t mangle -A XRAY -d 127.0.0.0/8 -j RETURN
-    iptables -t mangle -A XRAY -d 169.254.0.0/16 -j RETURN
+    iptables -t mangle -A XRAY -d 10.0.0.0/8 -j RETURN
     iptables -t mangle -A XRAY -d 172.16.0.0/12 -j RETURN
-    iptables -t mangle -A XRAY -d 192.0.0.0/24 -j RETURN
-    iptables -t mangle -A XRAY -d 224.0.0.0/4 -j RETURN
-    iptables -t mangle -A XRAY -d 240.0.0.0/4 -j RETURN
-    iptables -t mangle -A XRAY -d 255.255.255.255/32 -j RETURN
-#    iptables -t mangle -A XRAY -s 192.168.1.45 -j RETURN -m mark --mark 1
+    iptables -t mangle -A XRAY -d 192.168.0.0/16 -j RETURN
     iptables -t mangle -A XRAY -d 192.168.0.0/16 -p tcp ! --dport 53 -j RETURN
     iptables -t mangle -A XRAY -d 192.168.0.0/16 -p udp ! --dport 53 -j RETURN
     iptables -t mangle -A XRAY -j RETURN -m mark --mark 0xff
@@ -66,6 +53,7 @@ set_xray_iptables(){
 
     ip6tables-nft -t mangle -N XRAY6_MASK
     ip6tables-nft -t mangle -A XRAY6_MASK -d fe80::/10 -j RETURN
+    ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -j RETURN
     ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p tcp ! --dport 53 -j RETURN
     ip6tables-nft -t mangle -A XRAY6_MASK -d fd00::/8 -p udp ! --dport 53 -j RETURN
     ip6tables-nft -t mangle -A XRAY6_MASK -j RETURN -m mark --mark 0xff
@@ -82,10 +70,15 @@ set_xray_iptables(){
     ip6tables-nft -t mangle -A DIVERT -j MARK --set-mark 1
     ip6tables-nft -t mangle -A DIVERT -j ACCEPT
     ip6tables-nft -t mangle -I PREROUTING -p tcp -m socket -j DIVERT
+
+    iptables -t mangle -I XRAY 1 -i docker0 -j RETURN
+    ip6tables-nft -t mangle -I XRAY6_MASK 1 -i docker0 -j RETURN
 }
 
 reset_iptables
 set_xray_iptables
+
+echo "Iptables applied successfully."
 
 /xpanel/server
 exec "$@"
