@@ -10,17 +10,19 @@ import (
 // vlessToJSON vless Json
 func VlessToJSON(a string) (j *config.CodeList) {
 	var (
-		encryption string
-		security   string
-		headerType string
-		net        string
-		path       string
-		host       string
-		a1         []string
-		a2         []string
-		a3         []string
-		a4         []string
-		a5         []string
+		flow     string
+		security string
+		fp       string
+		net      string
+		path     string
+		host     string
+		pbk      string
+		sid      string
+		a1       []string
+		a2       []string
+		a3       []string
+		a4       []string
+		a5       []string
 	)
 	a1 = strings.Split(a, "@")
 	a2 = strings.Split(a1[1], "?")
@@ -30,18 +32,24 @@ func VlessToJSON(a string) (j *config.CodeList) {
 	for _, item := range a5 {
 		x := strings.Split(item, "=")
 		switch x[0] {
-		case "encryption":
-			encryption = x[1]
+		case "flow":
+			flow = x[1]
 		case "security":
 			security = x[1]
-		case "headerType":
-			headerType = x[1]
+		case "fp":
+			fp = x[1]
 		case "type":
 			net = x[1]
 		case "host":
 			host = x[1]
-		case "path":
+		case "sni":
+			host = x[1]
+		case "fingerprint":
 			path = x[1]
+		case "pbk":
+			pbk = x[1]
+		case "sid":
+			sid = x[1]
 		}
 	}
 	port, err := strconv.Atoi(a3[1])
@@ -54,17 +62,19 @@ func VlessToJSON(a string) (j *config.CodeList) {
 	}
 	title, _ := url.QueryUnescape(t)
 	j = &config.CodeList{
-		Password:   a1[0],
-		Address:    a3[0],
-		Port:       port,
-		Encryption: encryption,
-		Security:   security,
-		HeaderType: headerType,
-		Net:        net,
-		Host:       host,
-		Path:       path,
-		Title:      title,
-		Types:      "vless",
+		Password:  a1[0],
+		Address:   a3[0],
+		Port:      port,
+		Flow:      flow,
+		Security:  security,
+		Fp:        fp,
+		Net:       net,
+		Host:      host,
+		Path:      path,
+		Title:     title,
+		Types:     "vless",
+		Obfs:      pbk,
+		ObfsParam: sid,
 	}
 	return
 }

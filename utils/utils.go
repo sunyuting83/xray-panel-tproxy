@@ -150,7 +150,7 @@ func IgnoreTag(a []*config.CodeList, ignore string) []*config.CodeList {
 		var temp []*config.CodeList
 		for _, item := range a {
 			// val := reflect.ValueOf(item)
-			// title := val.Elem().Field(val.Elem().NumField() - 1).Interface().(string)
+			// title := val.Elem().Field(val.Elem().NumField() - 1).interface().(string)
 			exist := false
 			for _, ig := range ignoreList {
 				if strings.Contains(item.Title, ig) {
@@ -362,25 +362,25 @@ func DeleteNode(i int, p string) (b bool) {
 	return false
 }
 
-func GetRules(p string) ([]interface{}, string, map[string]interface{}, error) {
+func GetRules(p string) ([]any, string, map[string]any, error) {
 	jsonFile := strings.Join([]string{p, "template/tempEnd"}, "/")
 	d, _ := os.ReadFile(jsonFile)
 	data := string(d)
 	ignoreIndex := strings.Index(data, "255}}}],") + 8
 	ignoreString := data[ignoreIndex:]
 	content := strings.Join([]string{"{", ignoreString}, "")
-	m := make(map[string]interface{})
-	resolve := make([]interface{}, 0)
+	m := make(map[string]any)
+	resolve := make([]any, 0)
 	err := json.Unmarshal([]byte(content), &m)
 	if err != nil {
 		return resolve, "", m, err
 	}
-	rules := m["routing"].(map[string]interface{})["rules"].([]interface{})
+	rules := m["routing"].(map[string]any)["rules"].([]any)
 	return rules, data[0:ignoreIndex], m, nil
 }
 
-func GetDomains(p string) (map[string]interface{}, map[string]interface{}, string, []string, []string, error) {
-	resolve := make(map[string]interface{}, 0)
+func GetDomains(p string) (map[string]any, map[string]any, string, []string, []string, error) {
+	resolve := make(map[string]any, 0)
 	rules, startStr, jsons, err := GetRules(p)
 	if err != nil {
 		return resolve, jsons, "", make([]string, 0), make([]string, 0), err
@@ -389,7 +389,7 @@ func GetDomains(p string) (map[string]interface{}, map[string]interface{}, strin
 	directDomain := make([]string, 0)
 	for index, item := range rules {
 		if index == 7 {
-			proxyd := item.(map[string]interface{})["domain"].([]interface{})
+			proxyd := item.(map[string]any)["domain"].([]any)
 			for _, domain := range proxyd {
 				doString := fmt.Sprint(domain)
 				if strings.Contains(doString, ":") {
@@ -399,7 +399,7 @@ func GetDomains(p string) (map[string]interface{}, map[string]interface{}, strin
 			}
 		}
 		if index == 8 {
-			direct := item.(map[string]interface{})["domain"].([]interface{})
+			direct := item.(map[string]any)["domain"].([]any)
 			for _, domain := range direct {
 				doString := fmt.Sprint(domain)
 				if strings.Contains(doString, ":") {
@@ -439,15 +439,15 @@ func SetDomains(p string, domains config.Domains) bool {
 	for index, item := range formDirect {
 		formDirect[index] = strings.Join([]string{"domain", item}, ":")
 	}
-	ignoreProxy := StringSliceToInterfaceSlice(IgnoreRepeated(formProxy, proxy))
-	ignoreDirect := StringSliceToInterfaceSlice(IgnoreRepeated(formDirect, direct))
-	rules := jsons["routing"].(map[string]interface{})["rules"].([]interface{})
+	ignoreProxy := StringSliceTointerfaceSlice(IgnoreRepeated(formProxy, proxy))
+	ignoreDirect := StringSliceTointerfaceSlice(IgnoreRepeated(formDirect, direct))
+	rules := jsons["routing"].(map[string]any)["rules"].([]any)
 	for index, item := range rules {
 		if index == 7 {
-			item.(map[string]interface{})["domain"] = ignoreProxy
+			item.(map[string]any)["domain"] = ignoreProxy
 		}
 		if index == 8 {
-			item.(map[string]interface{})["domain"] = ignoreDirect
+			item.(map[string]any)["domain"] = ignoreDirect
 		}
 	}
 	// fmt.Println(startStr)
@@ -475,8 +475,8 @@ func GetIgnore(p string) (string, error) {
 	return string(data), nil
 }
 
-func GetDns(p string) ([]interface{}, error) {
-	var m []interface{}
+func GetDns(p string) ([]any, error) {
+	var m []any
 	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
 	data, err := os.ReadFile(jsonFile)
 	if err != nil {
@@ -498,7 +498,7 @@ func GetDns(p string) ([]interface{}, error) {
 }
 
 func SetDns(p, data string) bool {
-	var m []interface{}
+	var m []any
 	err := json.Unmarshal([]byte(data), &m)
 	if err != nil {
 		return false
@@ -519,8 +519,8 @@ func SetDns(p, data string) bool {
 	return false
 }
 
-func GetLocalSocks(p string) map[string]interface{} {
-	var m map[string]interface{} = make(map[string]interface{})
+func GetLocalSocks(p string) map[string]any {
+	var m map[string]any = make(map[string]any)
 	m["status"] = 0
 	m["SocksStatus"] = false
 	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
@@ -639,8 +639,8 @@ func GetNode(i int, p string) (j *config.CodeList) {
 	return
 }
 
-func StringSliceToInterfaceSlice(input []string) []interface{} {
-	result := make([]interface{}, len(input))
+func StringSliceTointerfaceSlice(input []string) []any {
+	result := make([]any, len(input))
 	for i, v := range input {
 		result[i] = v
 	}
@@ -709,7 +709,7 @@ func SaveConfigFile(pid string, r string) {
 // SetVmess set vmess
 func SetVmess(j *config.CodeList, p string) (b bool) {
 	code := ReadConfigFile(p, j.Types)
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	json.Unmarshal([]byte(code), &m)
 	protocol := j.Types
 	if j.Types == "ss" {
@@ -718,47 +718,59 @@ func SetVmess(j *config.CodeList, p string) (b bool) {
 	if j.Types == "trojan" {
 		protocol = "trojan"
 	}
-	m["outbounds"].([]interface{})[0].(map[string]interface{})["protocol"] = protocol
+	m["outbounds"].([]any)[0].(map[string]any)["protocol"] = protocol
 	switch j.Types {
 	case "vmess":
-		vnext := m["outbounds"].([]interface{})[0].(map[string]interface{})["settings"].(map[string]interface{})["vnext"].([]interface{})[0]
-		vnext.(map[string]interface{})["address"] = j.Address
-		vnext.(map[string]interface{})["port"] = j.Port
-		users := vnext.(map[string]interface{})["users"].([]interface{})[0]
-		users.(map[string]interface{})["id"] = j.Password
-		users.(map[string]interface{})["alterId"] = j.Aid
+		vnext := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["vnext"].([]any)[0]
+		vnext.(map[string]any)["address"] = j.Address
+		vnext.(map[string]any)["port"] = j.Port
+		users := vnext.(map[string]any)["users"].([]any)[0]
+		users.(map[string]any)["id"] = j.Password
+		users.(map[string]any)["alterId"] = j.Aid
 	case "vless":
-		vnext := m["outbounds"].([]interface{})[0].(map[string]interface{})["settings"].(map[string]interface{})["vnext"].([]interface{})[0]
-		vnext.(map[string]interface{})["address"] = j.Address
-		vnext.(map[string]interface{})["port"] = j.Port
-		users := vnext.(map[string]interface{})["users"].([]interface{})[0]
-		users.(map[string]interface{})["id"] = j.Password
+		vnext := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["vnext"].([]any)[0]
+		vnext.(map[string]any)["address"] = j.Address
+		vnext.(map[string]any)["port"] = j.Port
+		users := vnext.(map[string]any)["users"].([]any)[0]
+		users.(map[string]any)["id"] = j.Password
+		users.(map[string]any)["flow"] = j.Flow
+		streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"]
+		streamSettings.(map[string]any)["security"] = j.Security
+		streamSettings.(map[string]any)["network"] = j.Net
+		realitySettings := streamSettings.(map[string]any)["realitySettings"]
+		realitySettings.(map[string]any)["serverName"] = j.Host
+		realitySettings.(map[string]any)["publicKey"] = j.Obfs
+		realitySettings.(map[string]any)["shortId"] = j.ObfsParam
+		realitySettings.(map[string]any)["fingerprint"] = j.Path
+
 	case "ss":
-		users := m["outbounds"].([]interface{})[0].(map[string]interface{})["settings"].(map[string]interface{})["servers"].([]interface{})[0]
-		users.(map[string]interface{})["address"] = j.Address
-		users.(map[string]interface{})["port"] = j.Port
-		users.(map[string]interface{})["method"] = j.Method
-		users.(map[string]interface{})["password"] = j.Password
+		users := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["servers"].([]any)[0]
+		users.(map[string]any)["address"] = j.Address
+		users.(map[string]any)["port"] = j.Port
+		users.(map[string]any)["method"] = j.Method
+		users.(map[string]any)["password"] = j.Password
 	case "trojan":
-		users := m["outbounds"].([]interface{})[0].(map[string]interface{})["settings"].(map[string]interface{})["servers"].([]interface{})[0]
-		users.(map[string]interface{})["address"] = j.Address
-		users.(map[string]interface{})["port"] = j.Port
-		users.(map[string]interface{})["password"] = j.Password
-		streamSettings := m["outbounds"].([]interface{})[0].(map[string]interface{})["streamSettings"].(map[string]interface{})["tlsSettings"]
-		streamSettings.(map[string]interface{})["allowInsecure"] = true
-		streamSettings.(map[string]interface{})["serverName"] = j.Host
+		users := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["servers"].([]any)[0]
+		users.(map[string]any)["address"] = j.Address
+		users.(map[string]any)["port"] = j.Port
+		users.(map[string]any)["password"] = j.Password
+		streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"].(map[string]any)["tlsSettings"]
+		streamSettings.(map[string]any)["allowInsecure"] = true
+		streamSettings.(map[string]any)["serverName"] = j.Host
 	}
 	if j.Types != "ss" {
 		if j.Types != "trojan" {
-			streamSettings := m["outbounds"].([]interface{})[0].(map[string]interface{})["streamSettings"]
-			streamSettings.(map[string]interface{})["network"] = j.Net
-			tls := "none"
-			if j.TLS {
-				tls = "tls"
-				streamSettings.(map[string]interface{})["tlsSettings"].(map[string]interface{})["allowInsecure"] = true
+			if j.Types != "vless" {
+				streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"]
+				streamSettings.(map[string]any)["network"] = j.Net
+				tls := "none"
+				if j.TLS {
+					tls = "tls"
+					streamSettings.(map[string]any)["tlsSettings"].(map[string]any)["allowInsecure"] = true
+				}
+				streamSettings.(map[string]any)["security"] = tls
+				streamSettings.(map[string]any)["tlsSettings"].(map[string]any)["serverName"] = j.Host
 			}
-			streamSettings.(map[string]interface{})["security"] = tls
-			streamSettings.(map[string]interface{})["tlsSettings"].(map[string]interface{})["serverName"] = j.Host
 		}
 	}
 	saveData, _ := json.Marshal(m)
@@ -954,8 +966,8 @@ func GetPlatform(platform string) string {
 	return platform
 }
 
-func CheckVersion(CurrentPath string, proxy bool) map[string]interface{} {
-	var data map[string]interface{} = make(map[string]interface{})
+func CheckVersion(CurrentPath string, proxy bool) map[string]any {
+	var data map[string]any = make(map[string]any)
 	data["status"] = 0
 	data["CoreVersion"] = false
 	data["GeoVersion"] = false

@@ -9,9 +9,9 @@ type CodeList struct {
 	Address       string `json:"address"`
 	Port          int    `json:"port"`
 	Password      string `json:"password"`
-	Encryption    string `json:"encryption"`
+	Flow          string `json:"flow"`
 	Security      string `json:"security"`
-	HeaderType    string `json:"headerType"`
+	Fp            string `json:"fp"`
 	Method        string `json:"method"`
 	Protocol      string `json:"protocol"`
 	ProtocolParam string `json:"protocol_param"`
@@ -68,15 +68,17 @@ type Vary struct {
 
 // Vless vless
 type Vless struct {
-	UUID       string `json:"uuid"`
-	URL        string `json:"url"`
-	Port       int    `json:"port"`
-	Encryption string `json:"encryption"`
-	Security   string `json:"security"`
-	Type       string `json:"type"`
-	HeaderType string `json:"headerType"`
-	Types      string `json:"types"`
-	Title      string `json:"title"`
+	UUID     string `json:"uuid"`
+	URL      string `json:"url"`
+	Port     int    `json:"port"`
+	Flow     string `json:"flow"`
+	Security string `json:"security"`
+	Type     string `json:"type"`
+	Fp       string `json:"fp"`
+	Types    string `json:"types"`
+	Title    string `json:"title"`
+	Pbk      string `json:"pbk"`
+	Sid      string `json:"sid"`
 }
 
 // Node node
