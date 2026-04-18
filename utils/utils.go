@@ -741,7 +741,7 @@ func SetVmess(j *config.CodeList, p string) (b bool) {
 		realitySettings.(map[string]any)["serverName"] = j.Host
 		realitySettings.(map[string]any)["publicKey"] = j.Obfs
 		realitySettings.(map[string]any)["shortId"] = j.ObfsParam
-		realitySettings.(map[string]any)["fingerprint"] = j.Path
+		realitySettings.(map[string]any)["fingerprint"] = j.Fp
 
 	case "ss":
 		users := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["servers"].([]any)[0]
