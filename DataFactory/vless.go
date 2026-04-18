@@ -18,6 +18,7 @@ func VlessToJSON(a string) (j *config.CodeList) {
 		host     string
 		pbk      string
 		sid      string
+		sni      string
 		a1       []string
 		a2       []string
 		a3       []string
@@ -43,7 +44,7 @@ func VlessToJSON(a string) (j *config.CodeList) {
 		case "host":
 			host = x[1]
 		case "sni":
-			host = x[1]
+			sni = x[1]
 		case "fingerprint":
 			path = x[1]
 		case "pbk":
@@ -59,6 +60,9 @@ func VlessToJSON(a string) (j *config.CodeList) {
 	t := "测试节点"
 	if len(a4) > 1 {
 		t = a4[1]
+	}
+	if host == "" {
+		host = sni
 	}
 	title, _ := url.QueryUnescape(t)
 	j = &config.CodeList{
