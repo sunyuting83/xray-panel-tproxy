@@ -316,7 +316,7 @@ func GetRules(currentPath string) (map[string]string, error) {
 
 // UpdateRule 更新单条规则零件
 func UpdateRule(currentPath string, ruleType string, rawContent string) error {
-	// 1. 字段映射（必须与 GetRules 保持一致）
+	// 1. 定义字段映射
 	fieldMap := map[string]string{
 		"block_domain":  "domain",
 		"direct_app":    "process",
@@ -330,56 +330,58 @@ func UpdateRule(currentPath string, ruleType string, rawContent string) error {
 		return fmt.Errorf("不支持的规则类型: %s", ruleType)
 	}
 
-	// 2. 切割字符串并清洗
-	// 处理 \r\n (Windows) 和 \n (Unix)
+	// 2. 读取原有的 tmpl 文件内容
+	fileName := fmt.Sprintf("rule_%s.tmpl", ruleType)
+	filePath := filepath.Join(currentPath, "template", fileName)
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("读取模板失败: %v", err)
+	}
+
+	// 3. 解析原有 JSON 结构
+	var ruleData map[string]any
+	if err := json.Unmarshal(content, &ruleData); err != nil {
+		return fmt.Errorf("解析模板失败 (请检查 JSON 格式): %v", err)
+	}
+
+	// 4. 处理前端传来的新数据
 	rawLines := strings.Split(strings.ReplaceAll(rawContent, "\r\n", "\n"), "\n")
 	var cleanList []string
 
 	for _, line := range rawLines {
 		item := strings.TrimSpace(line)
 		if item == "" {
-			continue // 跳过空行
+			continue
 		}
 
-		// 3. 核心包装逻辑：针对域名类规则进行加固
+		// 域名类前缀自动包装逻辑
 		if ruleType == "block_domain" || ruleType == "direct_domain" || ruleType == "proxy_domain" {
-			// 如果用户已经手动写了前缀，先去掉，防止重复
 			item = strings.TrimPrefix(item, "domain:")
 			item = strings.TrimPrefix(item, "geosite:")
-
-			// 严谨判断：
-			// 如果包含 "."，认为是具体域名 -> 加上 domain:
-			// 如果不包含 "."，认为是预定义集合 -> 加上 geosite:
 			if strings.Contains(item, ".") {
 				item = "domain:" + item
 			} else {
 				item = "geosite:" + item
 			}
 		}
-
 		cleanList = append(cleanList, item)
 	}
 
-	// 4. 组装成原始 Map 结构
-	fullRule := map[string]any{
-		targetKey: cleanList,
-	}
+	// 5. 【关键修复】只覆盖目标字段，保留 outboundTag 和 type
+	ruleData[targetKey] = cleanList
 
-	// 5. 序列化为标准的 JSON 零件
-	finalJSON, err := json.MarshalIndent(fullRule, "", "  ")
+	// 6. 序列化回 JSON 并存回文件
+	finalJSON, err := json.MarshalIndent(ruleData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("JSON 编码失败: %v", err)
 	}
-
-	// 6. 写入文件并触发配置合成
-	fileName := fmt.Sprintf("rule_%s.tmpl", ruleType)
-	filePath := filepath.Join(currentPath, "template", fileName)
 
 	if err := os.WriteFile(filePath, finalJSON, 0644); err != nil {
 		return fmt.Errorf("写入文件失败: %v", err)
 	}
 
-	// 联动：重新生成 config.json 并尝试重启 Xray
+	// 7. 联动合成配置
 	return GenerateConfig(currentPath, "reload")
 }
 
