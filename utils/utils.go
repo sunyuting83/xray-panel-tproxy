@@ -168,33 +168,33 @@ func IgnoreTag(a []*config.CodeList, ignore string) []*config.CodeList {
 
 // RemoveRepeatedElement Remove Repeated Element
 func RemoveRepeatedElement(personList []*config.CodeList) (result []*config.CodeList) {
-	n := len(personList)
-	for i := 0; i < n; i++ {
-		repeat := false
-		for j := i + 1; j < len(personList); j++ {
-			if personList[i].Types == personList[j].Types &&
-				personList[i].Address == personList[j].Address &&
-				personList[i].Port == personList[j].Port &&
-				personList[i].Password == personList[j].Password &&
-				personList[i].Security == personList[j].Security &&
-				personList[i].Net == personList[j].Net &&
-				personList[i].Path == personList[j].Path &&
-				personList[i].TLS == personList[j].TLS &&
-				personList[i].Aid == personList[j].Aid &&
-				personList[i].Method == personList[j].Method &&
-				personList[i].Protocol == personList[j].Protocol &&
-				personList[i].ProtocolParam == personList[j].ProtocolParam &&
-				personList[i].Obfs == personList[j].Obfs &&
-				personList[i].ObfsParam == personList[j].ObfsParam &&
-				personList[i].Host == personList[j].Host {
-				repeat = true
-				break
-			}
+	// key 为节点唯一性特征字符串，value 为占位布尔值
+	seen := make(map[string]bool)
+
+	for _, node := range personList {
+		if node.Port == 0 {
+			continue
 		}
-		if !repeat {
-			if personList[i].Port != 0 {
-				result = append(result, personList[i])
-			}
+
+		// 生成节点的唯一指纹字符串
+		// 我们将影响连接的核心参数拼接在一起
+		fingerprint := fmt.Sprintf("%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s",
+			node.Type,
+			node.Address,
+			node.Port,
+			node.ID,
+			node.Password,
+			node.Network,
+			node.StreamSecurity,
+			node.PublicKey,
+			node.ShortId,
+			node.Flow,
+			node.Method,
+		)
+
+		if !seen[fingerprint] {
+			seen[fingerprint] = true
+			result = append(result, node)
 		}
 	}
 	return
@@ -242,13 +242,13 @@ func FormToJSON(s string) (result *config.CodeList, err error) {
 	return
 }
 
+/*
 // SetNodeToUnix Set Node To Unix
 func SetNodeToUnix(i int, p string) (b bool) {
 	j := GetNode(i, p)
 	if j == nil {
 		return false
 	}
-	/*
 		switch j.Types {
 		case "vless":
 			b = SetVmess(j, p, c, r, cu)
@@ -261,11 +261,10 @@ func SetNodeToUnix(i int, p string) (b bool) {
 		case "trojan":
 			b = SetVmess(j, p, c, r, cu)
 		}
-	*/
-	b = SetVmess(j, p)
+	// b = SetVmess(j, p)
 	return
 }
-
+*/
 // ReSetNodeToUnix Restart Set Node To Unix
 func GetCurrentNode(p string) int {
 	Index := 0
@@ -298,6 +297,7 @@ func GetCurrentNode(p string) int {
 	return Index
 }
 
+/*
 // ReSetNodeToUnix Restart Set Node To Unix
 func ReSetNodeToUnix(p string) {
 	configs := GetConfig()
@@ -320,13 +320,15 @@ func ReSetNodeToUnix(p string) {
 			for index, item := range result {
 				if item.Title == configs.Current {
 					j := GetNode(index, p)
-					SetVmess(j, p)
+					// SetVmess(j, p)
+					fmt.Println(j)
 					break
 				}
 			}
 		}
 	}
 }
+*/
 
 func DeleteNode(i int, p string) (b bool) {
 	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
@@ -362,6 +364,7 @@ func DeleteNode(i int, p string) (b bool) {
 	return false
 }
 
+/*
 func GetRules(p string) ([]any, string, map[string]any, error) {
 	jsonFile := strings.Join([]string{p, "template/tempEnd"}, "/")
 	d, _ := os.ReadFile(jsonFile)
@@ -457,6 +460,7 @@ func SetDomains(p string, domains config.Domains) bool {
 	os.WriteFile(jsonFile, []byte(newData), 0644)
 	return true
 }
+*/
 
 func GetSubscribes(p string) (string, error) {
 	jsonFile := strings.Join([]string{p, "data/subUrl"}, "/")
@@ -477,46 +481,69 @@ func GetIgnore(p string) (string, error) {
 
 func GetDns(p string) ([]any, error) {
 	var m []any
-	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
-	data, err := os.ReadFile(jsonFile)
+	// 1. 拼接绝对路径，指向你现在的 DNS 模板文件
+	dnsTmplPath := filepath.Join(p, "template", "dns_servers.tmpl")
+
+	// 2. 读取文件内容
+	data, err := os.ReadFile(dnsTmplPath)
 	if err != nil {
-		return m, err
+		return m, fmt.Errorf("读取 DNS 模板失败: %v", err)
 	}
-	dataStr := string(data)
-	if strings.Contains(dataStr, `"dns":{"servers":`) {
-		d1 := strings.Split(dataStr, `"dns":{"servers":`)[1]
-		d2 := strings.Split(d1, `},"inbounds":`)[0]
-		if len(d2) != 0 {
-			err := json.Unmarshal([]byte(d2), &m)
-			if err != nil {
-				return m, err
-			}
-		}
-		return m, nil
+
+	// 3. 定义一个临时结构体来匹配模板的 JSON 结构
+	// 模板内容是 {"servers": [...]}
+	var temp struct {
+		Servers []any `json:"servers"`
 	}
-	return m, err
+
+	// 4. 直接解析整个 JSON
+	err = json.Unmarshal(data, &temp)
+	if err != nil {
+		return m, fmt.Errorf("解析 DNS JSON 失败: %v", err)
+	}
+
+	// 5. 返回数组部分
+	return temp.Servers, nil
 }
 
 func SetDns(p, data string) bool {
+	// 1. 验证前端传来的 data (即 servers 数组部分) 是否是合法的 JSON 数组
 	var m []any
 	err := json.Unmarshal([]byte(data), &m)
 	if err != nil {
+		fmt.Printf("DNS 数组解析失败: %v\n", err)
 		return false
 	}
-	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
-	d0, err := os.ReadFile(jsonFile)
+
+	// 2. 构造完整的 DNS 模板内容: {"servers": [...]}
+	// 使用结构体序列化比字符串拼接更安全，能自动处理转义和格式
+	dnsStruct := struct {
+		Servers []any `json:"servers"`
+	}{
+		Servers: m,
+	}
+
+	finalJson, err := json.MarshalIndent(dnsStruct, "", "  ")
 	if err != nil {
 		return false
 	}
-	dataStr := string(d0)
-	if strings.Contains(dataStr, `"dns":{"servers":`) {
-		d1 := strings.Split(dataStr, `"dns":{"servers":`)[1]
-		d2 := strings.Split(d1, `},"inbounds":`)[1]
-		d3 := strings.Join([]string{`{"dns":{"servers":`, data, `},"inbounds":`, d2}, "")
-		os.WriteFile(jsonFile, []byte(d3), 0644)
-		return true
+
+	// 3. 写入模板文件 (绝对路径)
+	dnsTmplPath := filepath.Join(p, "template", "dns_servers.tmpl")
+	err = os.WriteFile(dnsTmplPath, finalJson, 0644)
+	if err != nil {
+		fmt.Printf("写入 DNS 模板失败: %v\n", err)
+		return false
 	}
-	return false
+
+	// 4. 重点：触发核心引擎，重新合成 config.json 并重启 Xray
+	// 这里直接调用我们之前写的 GenerateConfig
+	if err := GenerateConfig(p, "reload"); err != nil {
+		fmt.Printf("合成新配置失败: %v\n", err)
+		return false
+	}
+
+	return true
 }
 
 func GetLocalSocks(p string) map[string]any {
@@ -612,6 +639,7 @@ func SetIgnore(p, data string) bool {
 	return true
 }
 
+/*
 func GetNode(i int, p string) (j *config.CodeList) {
 	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
 	data, _ := os.ReadFile(jsonFile)
@@ -638,6 +666,7 @@ func GetNode(i int, p string) (j *config.CodeList) {
 	}
 	return
 }
+*/
 
 func StringSliceTointerfaceSlice(input []string) []any {
 	result := make([]any, len(input))
@@ -706,6 +735,7 @@ func SaveConfigFile(pid string, r string) {
 	os.WriteFile(r, saveConfig, 0644)
 }
 
+/*
 // SetVmess set vmess
 func SetVmess(j *config.CodeList, p string) (b bool) {
 	code := ReadConfigFile(p, j.Types)
@@ -836,7 +866,7 @@ func SetTrojan(j *config.CodeList, p string, c string, r string, cu string) (b b
 	SaveConfigFile("trojan", r)
 	return true
 }
-
+*/
 // RunCommand run command
 func RunCommand(command string) (pidstr string) {
 	// fmt.Println(command)
@@ -1132,7 +1162,17 @@ func RunCommandWithRes(cmdExec string) (k string, err error) {
 }
 
 func CheckXray() bool {
-	comd := "ps | grep xray | grep -v grep"
+	// 默认参数
+	psParam := "-ef"
+
+	// 如果是 Alpine 系统，去掉 -ef 参数
+	if _, err := os.Stat("/etc/alpine-release"); err == nil {
+		psParam = ""
+	}
+
+	// 动态拼接命令
+	comd := fmt.Sprintf("ps %s | grep xray | grep -v grep", psParam)
+
 	hasStatus := false
 	str, err := RunCommandWithRes(comd)
 	if err != nil {
@@ -1265,7 +1305,6 @@ func checkType(a string) (c bool) {
 	return false
 }
 
-// makeDates make dates
 func MakeDates(a []string) (b []*config.CodeList) {
 	for _, v := range a {
 		list := strings.Split(DeCodeBytes(v), "\n")

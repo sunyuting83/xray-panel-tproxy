@@ -2,10 +2,11 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 	config "xpanel/Config"
 	"xpanel/utils"
@@ -26,66 +27,90 @@ func SetConfigMiddleWare(CurrentPath string) gin.HandlerFunc {
 
 // upData updata
 func UpData(c *gin.Context) {
-	// path, _ := os.Executable()
-	// dir := filepath.Dir(path)
-	var Proxy string = c.DefaultQuery("proxy", "0")
-	current_path, _ := c.Get("current_path")
-	filename := strings.Join([]string{current_path.(string), "data/ignore"}, "/")
-	jsonFile := strings.Join([]string{current_path.(string), "data/dataFile"}, "/")
-	SubUrlFile := strings.Join([]string{current_path.(string), "data/subUrl"}, "/")
-	ignore, _ := os.ReadFile(filename)
-	subUrl, _ := os.ReadFile(SubUrlFile)
-	urlList := utils.GetSubUrl(subUrl, current_path.(string))
-	proxy := false
-	if Proxy != "0" {
-		proxy = true
-	}
-	data := utils.SyncGetData(urlList, proxy)
-	if len(data) > 0 {
-		base := utils.MakeDates(data)
+	// 1. 获取基础路径与参数
+	currentPathRaw, _ := c.Get("current_path")
+	currentPath := currentPathRaw.(string)
+	proxyFlag := c.DefaultQuery("proxy", "0") != "0"
+
+	// 2. 拼接文件路径 (统一到新架构路径)
+	ignoreFile := filepath.Join(currentPath, "data", "ignore")
+	subUrlFile := filepath.Join(currentPath, "data", "subUrl")
+	dataFile := filepath.Join(currentPath, "data", "data.json") // 这里的路径要和你 utils 读的地方一致
+
+	// 3. 读取配置
+	ignore, _ := os.ReadFile(ignoreFile)
+	subUrl, _ := os.ReadFile(subUrlFile)
+
+	// 4. 获取订阅数据
+	urlList := utils.GetSubUrl(subUrl, currentPath)
+	rawNodes := utils.SyncGetData(urlList, proxyFlag)
+
+	if len(rawNodes) > 0 {
+		// A. 转换节点为 CodeList 结构体 (这里内部要确保 types -> type 的转换)
+		base := utils.MakeDates(rawNodes)
+		// fmt.Println(base)
+		// B. 过滤与去重
 		datas := utils.IgnoreTag(base, string(ignore))
 		datas = utils.RemoveRepeatedElement(datas)
+
 		if len(datas) > 0 {
-			saveData, _ := json.Marshal(datas)
-			os.WriteFile(jsonFile, saveData, 0644)
+			// C. 关键点：重新分配 Index，确保与 data.json 物理位置对齐
+			for i := range datas {
+				datas[i].UID = utils.GenerateUID(datas[i])
+				datas[i].Index = i
+			}
+			// fmt.Println(datas)
+			// D. 序列化并保存 (Marshal 会自动根据你 CodeList 的 tag 转换字段名)
+			saveData, err := json.MarshalIndent(datas, "", "  ")
+			if err == nil {
+				os.WriteFile(dataFile, saveData, 0644)
+			}
 		}
+
 		c.JSON(200, gin.H{
 			"status":  0,
 			"date":    datas,
-			"message": "success",
+			"message": fmt.Sprintf("成功同步 %d 个节点", len(datas)),
 		})
 		return
 	}
-	failed := make([]string, 0)
+
 	c.JSON(200, gin.H{
 		"status":  1,
-		"date":    failed,
-		"message": "failed",
+		"date":    []string{},
+		"message": "未能获取到有效节点数据",
 	})
 }
 
 // nodeList
 func NodeList(c *gin.Context) {
-	current_path, _ := c.Get("current_path")
-	jsonFile := strings.Join([]string{current_path.(string), "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	if len(data) > 0 {
-		list := utils.ListToJsons(data)
+	// 1. 获取绝对路径
+	currentPath, exists := c.Get("current_path")
+	if !exists {
+		c.JSON(200, gin.H{"status": 1, "message": "path context missing"})
+		return
+	}
+
+	// 2. 调用新封装的获取列表函数
+	list, err := utils.GetNodeList(currentPath.(string))
+	if err != nil {
 		c.JSON(200, gin.H{
-			"status":  0,
-			"date":    list,
-			"message": "success",
+			"status":  1,
+			"date":    make([]string, 0),
+			"message": err.Error(),
 		})
 		return
 	}
-	failed := make([]string, 0)
+
+	// 3. 返回数据
 	c.JSON(200, gin.H{
-		"status":  1,
-		"date":    failed,
-		"message": "failed",
+		"status":  0,
+		"date":    list, // 注意：前端接收的字段名是 "date" (对应你原来的逻辑)
+		"message": "success",
 	})
 }
 
+/*
 // setNode set node
 func SetNode(c *gin.Context) {
 	var form config.Node
@@ -126,6 +151,30 @@ func SetNode(c *gin.Context) {
 		"status":  1,
 		"message": "error",
 	})
+}
+*/
+
+// SetNode 路由处理函数
+func SetNode(c *gin.Context) {
+	var form struct {
+		NODE string `json:"node"` // 对应你前端传回的 UID 字符串
+	}
+
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(200, gin.H{"status": 1, "message": err.Error()})
+		return
+	}
+
+	currentPath, _ := c.Get("current_path")
+
+	// 调用我们重写后的逻辑
+	success := utils.SetNodeAndReload(currentPath.(string), form.NODE)
+
+	if success {
+		c.JSON(200, gin.H{"status": 0, "message": "节点切换成功，服务已重启"})
+	} else {
+		c.JSON(200, gin.H{"status": 1, "message": "切换失败，请检查数据文件"})
+	}
 }
 
 func DeleteNode(c *gin.Context) {
@@ -169,6 +218,7 @@ func DeleteNode(c *gin.Context) {
 	})
 }
 
+/*
 func GetDomains(c *gin.Context) {
 	current_path, _ := c.Get("current_path")
 	n, _, _, _, _, err := utils.GetDomains(current_path.(string))
@@ -186,6 +236,8 @@ func GetDomains(c *gin.Context) {
 		"direct":  n["directDomain"],
 	})
 }
+
+
 
 func SetDomains(c *gin.Context) {
 	var form config.Domains
@@ -210,6 +262,41 @@ func SetDomains(c *gin.Context) {
 		"status":  1,
 		"message": "filed",
 	})
+}
+*/
+// GET /api/rules
+func GetAllRules(c *gin.Context) {
+	p, _ := c.Get("current_path")
+	res, err := utils.GetRules(p.(string))
+	if err != nil {
+		c.JSON(200, gin.H{"status": 1, "message": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"status": 0, "data": res})
+}
+
+// POST /api/rules/save
+func SaveSingleRule(c *gin.Context) {
+	var req struct {
+		Type string `json:"type"` // 例如 "proxy_domain"
+		Data string `json:"data"` // 字符串化的 JSON
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(200, gin.H{"status": 1, "message": "请求参数错误"})
+		return
+	}
+
+	p, _ := c.Get("current_path")
+
+	// 执行更新
+	if err := utils.UpdateRule(p.(string), req.Type, req.Data); err != nil {
+		c.JSON(200, gin.H{"status": 1, "message": err.Error()})
+		return
+	}
+	// utils.ReSetNodeToUnix(p.(string))
+
+	c.JSON(200, gin.H{"status": 0, "message": req.Type + " 已更新并重启 Xray"})
 }
 
 func GetSubscribes(c *gin.Context) {
@@ -296,14 +383,24 @@ func GetStatus(c *gin.Context) {
 		return
 	}
 	var current string = "未设定"
-	config := utils.GetConfig()
-	if config.Current != "" {
-		current = config.Current
+	current_path, _ := c.Get("current_path")
+	current = utils.GetCurrentUID(current_path.(string))
+
+	node, err := utils.GetNodeByUID(current_path.(string), current)
+
+	if err != nil {
+		c.JSON(200, gin.H{
+			"status":  1,
+			"message": "filed",
+		})
+		return
 	}
+
 	c.JSON(200, gin.H{
-		"status":  0,
-		"message": "success",
-		"current": current,
+		"status":        0,
+		"message":       "success",
+		"current":       current,
+		"current_title": node.Title,
 	})
 }
 
@@ -372,7 +469,7 @@ func SetDns(c *gin.Context) {
 		})
 		return
 	}
-	utils.ReSetNodeToUnix(current_path.(string))
+	// utils.ReSetNodeToUnix(current_path.(string))
 	c.JSON(200, gin.H{
 		"status":  0,
 		"message": "success",
@@ -418,7 +515,7 @@ func SetLocalSocks(c *gin.Context) {
 		})
 		return
 	}
-	utils.ReSetNodeToUnix(current_path.(string))
+	// utils.ReSetNodeToUnix(current_path.(string))
 	c.JSON(200, gin.H{
 		"status":  0,
 		"message": "success",
@@ -460,8 +557,8 @@ func InitRouter(CurrentPath string) *gin.Engine {
 		api.GET("/nodelist", NodeList)
 		api.PUT("/setnode", SetNode)
 		api.DELETE("/deletenode", DeleteNode)
-		api.GET("/GetDomains", GetDomains)
-		api.PUT("SetDomains", SetDomains)
+		api.GET("/GetAllRules", GetAllRules) // 统一使用 GetAllRules 来获取所有规则零件
+		api.PUT("/UpdateRule", SaveSingleRule)
 		api.GET("/GetSubscribes", GetSubscribes)
 		api.PUT("/SetSubscribes", SetSubscribes)
 		api.PUT("SetIgnore", SetIgnore)

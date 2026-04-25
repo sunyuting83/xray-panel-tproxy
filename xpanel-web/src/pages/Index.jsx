@@ -33,7 +33,7 @@ const Index = () => {
         const d = await httpServer(urilist.getstatus);
         if (d?.status === 0) {
           setStatus(true);
-          setCurrent(d.current);
+          setCurrent(d.current_title);
           localStorage.setItem('current', d.current);
         } else {
           setStatus(false);

@@ -1,1 +1,48 @@
-{"protocol":"vmess","settings":{"vnext":[{"address":"{{.Address}}","port":{{.Port}},"users":[{"alterId":{{.Aid}},"id":"{{.Password}}","level":0,"security":"{{.TLS}}","testsEnabled":"none"}]}]},"streamSettings":{"dsSettings":{"path":"/"},"httpSettings":{"host":[],"path":"/"},"kcpSettings":{"congestion":false,"downlinkCapacity":20,"header":{"type":"none"},"mtu":1350,"readBufferSize":1,"tti":20,"uplinkCapacity":5,"writeBufferSize":1},"network":"{{.Net}}","quicSettings":{"header":{"type":"none"},"key":"","security":""},"security":"none","sockopt":{"mark":255},"tcpSettings":{"header":{"request":{"headers":{},"method":"GET","path":[],"version":"1.1"},"response":{"headers":{},"reason":"OK","status":"200","version":"1.1"},"type":"none"}},"tlsSettings":{"allowInsecure":true,"allowInsecureCiphers":false,"alpn":[],"certificates":[],"disableSessionResumption":true,"disableSystemRoot":false,"serverName":"{{.Host}}","fingerprint":"chrome"},"wsSettings":{"headers":{"Host":""},"path":""}},"tag":"outBound_PROXY"}
+{
+  "protocol": "vmess",
+  "settings": {
+    "vnext": [
+      {
+        "address": "{{.Address}}",
+        "port": {{.Port}},
+        "users": [
+          {
+            "id": "{{.ID}}",
+            "alterId": {{.AlterID}},
+            "security": "auto",
+            "level": 0
+          }
+        ]
+      }
+    ]
+  },
+  "streamSettings": {
+    "network": "{{.Network}}",
+    "security": "{{.StreamSecurity}}",
+    {{- if eq .StreamSecurity "tls" }}
+    "tlsSettings": {
+      "serverName": "{{.Sni}}",
+      "allowInsecure": {{.AllowInsecure}},
+      "fingerprint": "{{.Fingerprint}}"
+    },
+    {{- end }}
+    {{- if eq .Network "ws" }}
+    "wsSettings": {
+      "path": "{{.Path}}",
+      "headers": {
+        "Host": "{{.Host}}"
+      }
+    },
+    {{- end }}
+    {{- if eq .Network "grpc" }}
+    "grpcSettings": {
+      "serviceName": "{{.Path}}"
+    },
+    {{- end }}
+    "sockopt": {
+      "mark": 255,
+      "tcpFastOpen": true
+    }
+  },
+  "tag": "outBound_PROXY"
+}

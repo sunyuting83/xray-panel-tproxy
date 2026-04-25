@@ -60,13 +60,13 @@ func TrojanToJSON(a string) (j *config.CodeList) {
 	}
 
 	j = &config.CodeList{
-		Types:    "trojan",
-		Title:    title,
-		Address:  address,
-		Port:     port,
-		Password: password,
-		Host:     host,
-		TLS:      allowInsecure,
+		Type:          "trojan",
+		Title:         title,
+		Address:       address,
+		Port:          port,
+		Password:      password,
+		Host:          host,
+		AllowInsecure: allowInsecure,
 	}
 	return
 }

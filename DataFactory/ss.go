@@ -77,7 +77,7 @@ func SsToJSON(a string) (j *config.CodeList) {
 	}
 
 	j = &config.CodeList{
-		Types:    "ss",
+		Type:     "ss",
 		Title:    title,
 		Address:  address,
 		Port:     port,

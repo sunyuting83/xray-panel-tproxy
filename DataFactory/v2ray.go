@@ -19,7 +19,7 @@ func V2rayToJSON(item string) (j *config.CodeList) {
 		obfs      string
 		alterid   int
 		tls       string
-		tlsa      bool
+		// tlsa   bool // 弃用旧的布尔值，直接映射到 StreamSecurity
 	)
 
 	if strings.Contains(item, "?remarks=") {
@@ -42,6 +42,9 @@ func V2rayToJSON(item string) (j *config.CodeList) {
 		l := strings.Split(params, and)
 		for _, it := range l {
 			x := strings.Split(it, "=")
+			if len(x) < 2 {
+				continue
+			} // 安全检查
 			switch x[0] {
 			case "remarks":
 				ps = x[1]
@@ -60,22 +63,24 @@ func V2rayToJSON(item string) (j *config.CodeList) {
 		if ps == "" {
 			ps = "未知名称"
 		}
-		if tls == "1" {
-			tlsa = true
-		} else {
-			tlsa = false
+
+		// 核心对齐逻辑
+		streamSec := ""
+		if tls == "1" || tls == "tls" {
+			streamSec = "tls"
 		}
+
 		j = &config.CodeList{
-			Types:    "vmess",
-			Title:    ps,
-			Host:     obfsParam,
-			Path:     path,
-			TLS:      tlsa,
-			Address:  host,
-			Port:     port,
-			Password: uuid,
-			Aid:      alterid,
-			Net:      obfs,
+			Type:           "vmess", // 确保类型正确
+			Title:          ps,
+			Address:        host,
+			Port:           port,
+			ID:             uuid, // UUID 对应新结构的 ID
+			AlterID:        alterid,
+			Network:        obfs, // 原来叫 Net, 现在叫 Network
+			Path:           path,
+			Host:           obfsParam,
+			StreamSecurity: streamSec, // 统一安全层
 		}
 	} else {
 		newstr = DeBase(item)
@@ -87,30 +92,7 @@ func V2rayToJSON(item string) (j *config.CodeList) {
 	return
 }
 
-func UnmarshalJSON(t *config.Vary, data []byte) error {
-	type VaryAlias config.Vary
-	v2ray := &VaryAlias{
-		Host:  "",
-		Path:  "",
-		TLS:   false,
-		Ps:    "noname",
-		Add:   "0.0.0.0",
-		Port:  0,
-		ID:    "",
-		Aid:   0,
-		Net:   "tcp",
-		Type:  "none",
-		Types: "vmess",
-		Title: "noname",
-	}
-
-	_ = json.Unmarshal(data, v2ray)
-
-	*t = config.Vary(*v2ray)
-	return nil
-}
-
-// V2rayToJsons fun
+// V2rayToJsons 处理标准 VMess JSON 分享链接 (Base64 解码后的)
 func V2rayToJsons(s string) (result *config.CodeList) {
 	var (
 		a     []byte = []byte(s)
@@ -122,6 +104,8 @@ func V2rayToJsons(s string) (result *config.CodeList) {
 		s = strings.Replace(s, "\t", "", -1)
 		s = strings.Replace(s, "\r", "", -1)
 	}
+
+	// 你原来的兼容端口为字符串形式的 hack 逻辑保留
 	if strings.Contains(s, `"port":"`) {
 		portString := `"port":"`
 		overLen := len(s)
@@ -134,24 +118,34 @@ func V2rayToJsons(s string) (result *config.CodeList) {
 		newStr := strings.Join([]string{firstStr, portNum, overStr}, "")
 		a = []byte(newStr)
 	}
+
 	index = bytes.IndexByte(a, 0)
 	if index != -1 {
 		a = a[:index]
 	}
+
 	r := &config.Vary{}
 	_ = json.Unmarshal(a, &r)
-	result = &config.CodeList{
-		Types:    "vmess",
-		Title:    r.Ps,
-		Host:     r.Host,
-		Path:     r.Path,
-		TLS:      r.TLS,
-		Address:  r.Add,
-		Port:     r.Port,
-		Password: r.ID,
-		Aid:      r.Aid,
-		Net:      r.Net,
+
+	// 处理 TLS 映射
+	streamSec := ""
+	if r.TLS { // config.Vary 里的 TLS 是布尔值
+		streamSec = "tls"
 	}
-	result.Types = "vmess"
+
+	result = &config.CodeList{
+		Type:           "vmess", // 统一使用 Type
+		Title:          r.Ps,
+		Address:        r.Add,
+		Port:           r.Port,
+		ID:             r.ID, // UUID 对应 ID
+		AlterID:        r.Aid,
+		Network:        r.Net, // 对齐 Network
+		Path:           r.Path,
+		Host:           r.Host,
+		StreamSecurity: streamSec, // 映射为字符串 "tls"
+		Sni:            r.Host,    // VMess 开启 TLS 时，SNI 通常等于 Host
+		Fingerprint:    "chrome",  // 预设一个指纹，现代节点通用
+	}
 	return
 }

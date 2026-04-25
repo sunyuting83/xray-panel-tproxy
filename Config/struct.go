@@ -4,25 +4,39 @@ import "time"
 
 // CodeList code list
 type CodeList struct {
-	Types         string `json:"types"`
-	Title         string `json:"title"`
-	Address       string `json:"address"`
-	Port          int    `json:"port"`
-	Password      string `json:"password"`
-	Flow          string `json:"flow"`
-	Security      string `json:"security"`
-	Fp            string `json:"fp"`
-	Method        string `json:"method"`
-	Protocol      string `json:"protocol"`
-	ProtocolParam string `json:"protocol_param"`
-	Obfs          string `json:"obfs"`
-	ObfsParam     string `json:"obfs_param"`
-	Net           string `json:"net"`
-	Host          string `json:"host"`
-	Path          string `json:"path"`
-	TLS           bool   `json:"tls"`
-	Aid           int    `json:"aid"`
-	Ping          string `json:"ping"`
+	// --- 基础识别 ---
+	Index   int    `json:"index"` // 节点索引
+	UID     string `json:"uid"`
+	Type    string `json:"type"`    // vless, vmess, shadowsocks, trojan
+	Title   string `json:"title"`   // 节点名称
+	Address string `json:"address"` // 服务器 IP/域名
+	Port    int    `json:"port"`    // 端口
+
+	// --- 认证信息 ---
+	ID       string `json:"id"`       // vless/vmess 的 UUID
+	Password string `json:"password"` // ss/trojan 的密码
+	Security string `json:"security"` // vless 专用, 一般为 "none"
+
+	// --- 传输层 (StreamSettings) ---
+	Network string `json:"network"` // tcp, ws, grpc, h2, mkcp, quic
+	Path    string `json:"path"`    // ws/grpc/h2 的路径
+	Host    string `json:"host"`    // ws/h2 的 host 头部
+
+	// --- 安全层 (TLS/Reality) ---
+	StreamSecurity string `json:"stream_security"` // "", "tls", "reality"
+	Sni            string `json:"sni"`             // 服务器域名 (SNI)
+	Fingerprint    string `json:"fingerprint"`     // 指纹: chrome, edge, safari, firefox
+	AllowInsecure  bool   `json:"allow_insecure"`  // 跳过证书检查
+
+	// Reality 特有
+	PublicKey string `json:"public_key"`
+	ShortId   string `json:"short_id"`
+	SpiderX   string `json:"spider_x"`
+
+	// --- 协议特性 ---
+	Flow    string `json:"flow"`   // vless 专用: xtls-rprx-vision
+	Method  string `json:"method"` // ss 专用: 加密方法
+	AlterID int    `json:"aid"`    // vmess 专用 (虽然现在通常为 0)
 }
 
 // SS ss

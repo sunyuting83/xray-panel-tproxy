@@ -24,9 +24,25 @@ func main() {
 	hasStatus := utils.CheckXray()
 
 	if !hasStatus {
-		index := utils.GetCurrentNode(CurrentPath)
-		node := utils.GetNode(index, CurrentPath)
-		utils.RunXray(CurrentPath, "start", node.Title)
+		// 1. 获取当前 UID (settings.json)
+		uid := utils.GetCurrentUID(CurrentPath)
+
+		// 2. 获取节点数据 (data.json)
+		node, err := utils.GetNodeByUID(CurrentPath, uid)
+
+		if err != nil {
+			log.Printf("启动失败，无法获取节点: %v", err)
+			// 如果获取不到节点，可以尝试获取第一个节点作为保底
+			log.Println("尝试使用默认节点配置...")
+		}
+
+		// 3. 核心修正：启动时先执行一次全量合成
+		// 这一步会根据当前的 index 和所有 .tmpl 零件生成 config.json，然后内部会自动调用 RunXray
+		if err := utils.GenerateConfig(CurrentPath, "start"); err != nil {
+			log.Fatalf("初始化配置失败: %v", err)
+		}
+
+		log.Printf("Xray 已根据节点 [%s] 初始化并启动", node.Title)
 	}
 
 	gin.SetMode(gin.ReleaseMode)

@@ -19,7 +19,7 @@ export const WsProvider = ({ children }) => {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUri = `${protocol}//${window.location.host}/ws`;
-    // const wsUri = `${protocol}//192.168.51.253:13005/ws`;
+    // const wsUri = `${protocol}//localhost:13005/ws`;
     const socket = new WebSocket(wsUri);
 
     socket.onopen = () => {

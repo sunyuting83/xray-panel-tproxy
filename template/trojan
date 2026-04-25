@@ -1,1 +1,0 @@
-"outbounds":[{"protocol":"trojan","settings":{"servers":[{"address":"","port":443,"password":""}]},"streamSettings": {"network": "tcp","security": "tls","tlsSettings": {"allowInsecure": false,"serverName": ""},"sockopt": {"mark": 255,"tcpFastOpen": true}},"tag":"outBound_PROXY"}

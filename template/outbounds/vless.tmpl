@@ -1,1 +1,43 @@
-{"protocol":"vless","settings":{"vnext":[{"address":"{{.Address}}","port":{{.Port}},"users":[{"id":"{{.Password}}","encryption":"none","flow":"{{.Flow}}"}]}]},"streamSettings":{"network":"{{.Net}}","security":"{{.Security}}","realitySettings":{"show":false,"fingerprint":"{{.Fp}}","serverName":"{{.Host}}","publicKey":"{{.Obfs}}","shortId":"{{.ObfsParam}}","spiderX":"/"},"sockopt":{"mark":255,"tcpFastOpen":true}},"tag":"outBound_PROXY"}
+{
+  "protocol": "vless",
+  "settings": {
+    "vnext": [
+      {
+        "address": "{{.Address}}",
+        "port": {{.Port}},
+        "users": [
+          {
+            "id": "{{.ID}}",
+            "encryption": "none",
+            "flow": "{{.Flow}}"
+          }
+        ]
+      }
+    ]
+  },
+  "streamSettings": {
+    "network": "{{.Network}}",
+    "security": "{{.StreamSecurity}}",
+    {{- if eq .StreamSecurity "reality" }}
+    "realitySettings": {
+      "show": false,
+      "fingerprint": "{{.Fingerprint}}",
+      "serverName": "{{.Sni}}",
+      "publicKey": "{{.PublicKey}}",
+      "shortId": "{{.ShortId}}",
+      "spiderX": "{{.SpiderX}}"
+    },
+    {{- end }}
+    {{- if eq .StreamSecurity "tls" }}
+    "tlsSettings": {
+      "serverName": "{{.Sni}}",
+      "allowInsecure": {{.AllowInsecure}}
+    },
+    {{- end }}
+    "sockopt": {
+      "mark": 255,
+      "tcpFastOpen": true
+    }
+  },
+  "tag": "outBound_PROXY"
+}

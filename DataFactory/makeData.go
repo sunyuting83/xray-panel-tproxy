@@ -15,8 +15,6 @@ func MakeDate(a string, n string) (j *config.CodeList) {
 		j = TrojanToJSON(n)
 	case "vmess":
 		j = V2rayToJSON(n)
-	case "ssr":
-		j = SsrToJSON(n)
 	}
 	return
 }

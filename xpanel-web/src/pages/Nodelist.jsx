@@ -128,11 +128,12 @@ const NodeList = () => {
     }
   }
 
-  const SetNode = async (i, title) => {
-    const d = await httpServer(urilist.setnode, { node: String(i) }, 'put')
+  const SetNode = async (i, uid, title) => {
+    const d = await httpServer(urilist.setnode, { node: uid }, 'put')
     if (d.status === 0) {
-      localStorage.setItem('current', title)
-      setCurrent(title)
+      localStorage.setItem('current', uid)
+      localStorage.setItem('current_title', title)
+      setCurrent(uid)
       OpenModal() // 这里会触发延迟测速
     } else {
       OpenNotification(d.message, 'danger')
@@ -208,9 +209,9 @@ const NodeList = () => {
                   </thead>
                   <tbody className="is-size-7">
                     {data.map((item, index) => (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{item.types}</td>
+                      <tr key={item.uid}>
+                        <td>{item.index}</td>
+                        <td>{item.type}</td>
                         <td>{item.title}</td>
                         <td>
                           {item.ping !== undefined ? (
@@ -223,10 +224,10 @@ const NodeList = () => {
                           <div className="buttons">
                             <button 
                               className="button is-success is-small" 
-                              disabled={current === item.title} 
-                              onClick={() => SetNode(index, item.title)}
+                              disabled={current === item.uid} 
+                              onClick={() => SetNode(index, item.uid, item.title)}
                             >
-                              {current === item.title ? '当前节点' : '使用节点'}
+                              {current === item.uid ? '当前节点' : '使用节点'}
                             </button>
                             <button className="button is-info is-small" onClick={() => DeleteNode(index)}>删除</button>
                           </div>
