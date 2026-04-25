@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,13 +18,13 @@ import (
 
 func TestTCPing(ID string) {
 	current_path, _ := utils.GetCurrentPath()
-	jsonFile := strings.Join([]string{current_path, "data/dataFile"}, "/")
+	jsonFile := filepath.Join(current_path, "data", "data.json")
 	data, _ := os.ReadFile(jsonFile)
 	list := utils.ListToJsons(data)
 	if len(*list) > 0 {
-		for i, item := range *list {
+		for _, item := range *list {
 			port := strconv.Itoa(item.Port)
-			index := strconv.Itoa(i)
+			index := strconv.Itoa(item.Index)
 			elapsedTime, err := TCPing(item.Address, port)
 			speed := "0"
 			if err == nil {
