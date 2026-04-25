@@ -11,27 +11,5 @@
       }
     ]
   },
-  "streamSettings": {
-    "network": "{{.Network}}",
-    "security": "{{.StreamSecurity}}",
-    {{- if eq .StreamSecurity "tls" }}
-    "tlsSettings": {
-      "serverName": "{{.Sni}}",
-      "allowInsecure": {{.AllowInsecure}}
-    },
-    {{- end }}
-    {{- if eq .Network "ws" }}
-    "wsSettings": {
-      "path": "{{.Path}}",
-      "headers": {
-        "Host": "{{.Host}}"
-      }
-    },
-    {{- end }}
-    "sockopt": {
-      "mark": 255,
-      "tcpFastOpen": true
-    }
-  },
   "tag": "outBound_PROXY"
 }
