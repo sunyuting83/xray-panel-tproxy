@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 	config "xpanel/Config"
 	"xpanel/utils"
@@ -110,50 +109,6 @@ func NodeList(c *gin.Context) {
 	})
 }
 
-/*
-// setNode set node
-func SetNode(c *gin.Context) {
-	var form config.Node
-	// This will infer what binder to use depending on the content-type header.
-	if err := c.ShouldBind(&form); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  1,
-			"message": err.Error(),
-		})
-		return
-	}
-
-	if len(form.NODE) <= 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  1,
-			"message": "haven't node",
-		})
-		return
-	}
-	NodeIndex, err := strconv.Atoi(form.NODE)
-	if err != nil {
-		c.JSON(200, gin.H{
-			"status":  1,
-			"message": "decode error",
-		})
-		return
-	}
-	current_path, _ := c.Get("current_path")
-	n := utils.SetNodeToUnix(NodeIndex, current_path.(string))
-	if n {
-		c.JSON(200, gin.H{
-			"status":  0,
-			"message": "success",
-		})
-		return
-	}
-	c.JSON(200, gin.H{
-		"status":  1,
-		"message": "error",
-	})
-}
-*/
-
 // SetNode 路由处理函数
 func SetNode(c *gin.Context) {
 	var form struct {
@@ -195,16 +150,8 @@ func DeleteNode(c *gin.Context) {
 		})
 		return
 	}
-	NodeIndex, err := strconv.Atoi(form.NODE)
-	if err != nil {
-		c.JSON(200, gin.H{
-			"status":  1,
-			"message": "decode error",
-		})
-		return
-	}
 	current_path, _ := c.Get("current_path")
-	n := utils.DeleteNode(NodeIndex, current_path.(string))
+	n := utils.DeleteNode(form.NODE, current_path.(string))
 	if n {
 		c.JSON(200, gin.H{
 			"status":  0,
@@ -218,52 +165,6 @@ func DeleteNode(c *gin.Context) {
 	})
 }
 
-/*
-func GetDomains(c *gin.Context) {
-	current_path, _ := c.Get("current_path")
-	n, _, _, _, _, err := utils.GetDomains(current_path.(string))
-	if err != nil {
-		c.JSON(200, gin.H{
-			"status":  1,
-			"message": "json decode is failed",
-		})
-		return
-	}
-	c.JSON(200, gin.H{
-		"status":  0,
-		"message": "success",
-		"proxy":   n["proxyDomain"],
-		"direct":  n["directDomain"],
-	})
-}
-
-
-
-func SetDomains(c *gin.Context) {
-	var form config.Domains
-	if err := c.ShouldBind(&form); err != nil {
-		c.JSON(200, gin.H{
-			"status":  1,
-			"message": err.Error(),
-		})
-		return
-	}
-	current_path, _ := c.Get("current_path")
-	domain := utils.SetDomains(current_path.(string), form)
-	if domain {
-		utils.ReSetNodeToUnix(current_path.(string))
-		c.JSON(200, gin.H{
-			"status":  0,
-			"message": "保存成功",
-		})
-		return
-	}
-	c.JSON(200, gin.H{
-		"status":  1,
-		"message": "filed",
-	})
-}
-*/
 // GET /api/rules
 func GetAllRules(c *gin.Context) {
 	p, _ := c.Get("current_path")

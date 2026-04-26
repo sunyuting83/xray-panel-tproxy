@@ -121,14 +121,14 @@ const NodeList = () => {
     })
   }
 
-  const DeleteNode = async (i) => {
-    const d = await httpServer(urilist.deletenode, { node: String(i) }, 'DELETE')
+  const DeleteNode = async (uid) => {
+    const d = await httpServer(urilist.deletenode, { node: uid }, 'DELETE')
     if (d.status === 0) {
-      setData(data.filter((_, index) => index !== i))
+      setData(data.filter((item) => item.uid !== uid))
     }
   }
 
-  const SetNode = async (i, uid, title) => {
+  const SetNode = async (uid, title) => {
     const d = await httpServer(urilist.setnode, { node: uid }, 'put')
     if (d.status === 0) {
       localStorage.setItem('current', uid)
@@ -208,7 +208,7 @@ const NodeList = () => {
                     </tr>
                   </thead>
                   <tbody className="is-size-7">
-                    {data.map((item, index) => (
+                    {data.map((item) => (
                       <tr key={item.uid}>
                         <td>{item.index}</td>
                         <td>{item.type}</td>
@@ -225,11 +225,11 @@ const NodeList = () => {
                             <button 
                               className="button is-success is-small" 
                               disabled={current === item.uid} 
-                              onClick={() => SetNode(index, item.uid, item.title)}
+                              onClick={() => SetNode(item.uid, item.title)}
                             >
                               {current === item.uid ? '当前节点' : '使用节点'}
                             </button>
-                            <button className="button is-info is-small" onClick={() => DeleteNode(index)}>删除</button>
+                            <button className="button is-info is-small" onClick={() => DeleteNode(item.uid)}>删除</button>
                           </div>
                         </td>
                       </tr>

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -225,242 +226,52 @@ func ListToJsons(s []byte) (result *[]config.CodeList) {
 setNode function start
 */
 
-// FormToJSON Form To JSON
-func FormToJSON(s string) (result *config.CodeList, err error) {
-	decode := DeCodeBytes(s)
-	code := []byte(decode)
-	var (
-		index int = len(code)
-	)
-	index = bytes.IndexByte(code, 0)
-	if index != -1 {
-		code = code[:index]
+func DeleteNode(uid string, p string) bool {
+	// 1. 定义两个潜在的数据源
+	files := []string{
+		filepath.Join(p, "data", "data.json"),   // 订阅节点
+		filepath.Join(p, "data", "manual.json"), // 手动节点
 	}
-	if err = json.Unmarshal(code, &result); err != nil {
-		return
-	}
-	return
-}
 
-/*
-// SetNodeToUnix Set Node To Unix
-func SetNodeToUnix(i int, p string) (b bool) {
-	j := GetNode(i, p)
-	if j == nil {
-		return false
-	}
-		switch j.Types {
-		case "vless":
-			b = SetVmess(j, p, c, r, cu)
-		case "vmess":
-			b = SetVmess(j, p, c, r, cu)
-		case "ss":
-			b = SetVmess(j, p, c, r, cu)
-		case "ssr":
-			b = SetSSR(j, p, c, r, cu)
-		case "trojan":
-			b = SetVmess(j, p, c, r, cu)
+	for _, jsonFile := range files {
+		// 读取文件
+		data, err := os.ReadFile(jsonFile)
+		if err != nil || len(data) == 0 {
+			continue
 		}
-	// b = SetVmess(j, p)
-	return
-}
-*/
-// ReSetNodeToUnix Restart Set Node To Unix
-func GetCurrentNode(p string) int {
-	Index := 0
-	configs := GetConfig()
-	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	var result []config.CodeList
-	if len(data) > 0 {
-		var (
-			index int = len(data)
-		)
-		index = bytes.IndexByte(data, 0)
-		if index != -1 {
+
+		// 处理可能存在的 null 字符截断（沿用你原来的安全处理）
+		if index := bytes.IndexByte(data, 0); index != -1 {
 			data = data[:index]
 		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return Index
-		}
-		Arrlen := len(result)
-		if Arrlen > 0 {
-			for index, item := range result {
-				if item.Title == configs.Current {
-					Index = index
-					break
-				}
-			}
-		}
-		return Index
-	}
-	return Index
-}
 
-/*
-// ReSetNodeToUnix Restart Set Node To Unix
-func ReSetNodeToUnix(p string) {
-	configs := GetConfig()
-	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	var result []config.CodeList
-	if len(data) > 0 {
-		var (
-			index int = len(data)
-		)
-		index = bytes.IndexByte(data, 0)
-		if index != -1 {
-			data = data[:index]
+		var nodes []config.CodeList
+		if err := json.Unmarshal(data, &nodes); err != nil {
+			continue
 		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return
-		}
-		Arrlen := len(result)
-		if Arrlen > 0 {
-			for index, item := range result {
-				if item.Title == configs.Current {
-					j := GetNode(index, p)
-					// SetVmess(j, p)
-					fmt.Println(j)
-					break
-				}
-			}
-		}
-	}
-}
-*/
 
-func DeleteNode(i int, p string) (b bool) {
-	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	var result []config.CodeList
-	if len(data) > 0 {
-		var (
-			index int = len(data)
-		)
-		index = bytes.IndexByte(data, 0)
-		if index != -1 {
-			data = data[:index]
-		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return
-		}
-		Arrlen := len(result)
-		if Arrlen > 0 {
-			for index := range result {
-				if index == i {
-					if i == Arrlen-1 {
-						result = result[0:i]
-					} else {
-						result = append(result[0:i], result[i+1:]...)
-					}
-					saveConfig, _ := json.Marshal(result)
-					os.WriteFile(jsonFile, saveConfig, 0644)
-					return true
-				}
+		// 2. 使用 UID 查找并删除
+		found := false
+		for i, node := range nodes {
+			if node.UID == uid {
+				// 执行删除：利用 Go 切片特性
+				nodes = append(nodes[:i], nodes[i+1:]...)
+				found = true
+				break
 			}
 		}
+
+		// 3. 如果在该文件中找到了并删除了，写回文件并返回成功
+		if found {
+			saveConfig, _ := json.MarshalIndent(nodes, "", "  ") // 使用 Indent 方便调试查看
+			err = os.WriteFile(jsonFile, saveConfig, 0644)
+			return err == nil
+		}
 	}
+
+	// 两个文件都没找到
 	return false
 }
-
-/*
-func GetRules(p string) ([]any, string, map[string]any, error) {
-	jsonFile := strings.Join([]string{p, "template/tempEnd"}, "/")
-	d, _ := os.ReadFile(jsonFile)
-	data := string(d)
-	ignoreIndex := strings.Index(data, "255}}}],") + 8
-	ignoreString := data[ignoreIndex:]
-	content := strings.Join([]string{"{", ignoreString}, "")
-	m := make(map[string]any)
-	resolve := make([]any, 0)
-	err := json.Unmarshal([]byte(content), &m)
-	if err != nil {
-		return resolve, "", m, err
-	}
-	rules := m["routing"].(map[string]any)["rules"].([]any)
-	return rules, data[0:ignoreIndex], m, nil
-}
-
-func GetDomains(p string) (map[string]any, map[string]any, string, []string, []string, error) {
-	resolve := make(map[string]any, 0)
-	rules, startStr, jsons, err := GetRules(p)
-	if err != nil {
-		return resolve, jsons, "", make([]string, 0), make([]string, 0), err
-	}
-	proxyDomain := make([]string, 0)
-	directDomain := make([]string, 0)
-	for index, item := range rules {
-		if index == 7 {
-			proxyd := item.(map[string]any)["domain"].([]any)
-			for _, domain := range proxyd {
-				doString := fmt.Sprint(domain)
-				if strings.Contains(doString, ":") {
-					do := strings.Split((doString), ":")[1]
-					proxyDomain = append(proxyDomain, do)
-				}
-			}
-		}
-		if index == 8 {
-			direct := item.(map[string]any)["domain"].([]any)
-			for _, domain := range direct {
-				doString := fmt.Sprint(domain)
-				if strings.Contains(doString, ":") {
-					do := strings.Split((doString), ":")[1]
-					directDomain = append(directDomain, do)
-				}
-			}
-		}
-	}
-	resolve["proxyDomain"] = strings.Join(proxyDomain, "\n")
-	resolve["directDomain"] = strings.Join(directDomain, "\n")
-	return resolve, jsons, startStr, proxyDomain, directDomain, nil
-}
-
-func SetDomains(p string, domains config.Domains) bool {
-	_, jsons, startStr, proxy, direct, err := GetDomains(p)
-	if err != nil {
-		return false
-	}
-	var (
-		formProxy  []string
-		formDirect []string
-	)
-	if strings.Contains(domains.Proxy, "\n") {
-		formProxy = RemoveRepeatedSingle(strings.Split(domains.Proxy, "\n"))
-	}
-	if strings.Contains(domains.Direct, "\n") {
-		formDirect = RemoveRepeatedSingle(strings.Split(domains.Direct, "\n"))
-	}
-	for index, item := range formProxy {
-		if strings.Contains(item, ".") {
-			formProxy[index] = strings.Join([]string{"domain", item}, ":")
-		} else {
-			formProxy[index] = strings.Join([]string{"geosite", item}, ":")
-		}
-	}
-	for index, item := range formDirect {
-		formDirect[index] = strings.Join([]string{"domain", item}, ":")
-	}
-	ignoreProxy := StringSliceTointerfaceSlice(IgnoreRepeated(formProxy, proxy))
-	ignoreDirect := StringSliceTointerfaceSlice(IgnoreRepeated(formDirect, direct))
-	rules := jsons["routing"].(map[string]any)["rules"].([]any)
-	for index, item := range rules {
-		if index == 7 {
-			item.(map[string]any)["domain"] = ignoreProxy
-		}
-		if index == 8 {
-			item.(map[string]any)["domain"] = ignoreDirect
-		}
-	}
-	// fmt.Println(startStr)
-	newRules, _ := json.Marshal(jsons)
-	newData := strings.Join([]string{startStr, string(newRules)[1:]}, "")
-	jsonFile := strings.Join([]string{p, "template/tempEnd"}, "/")
-	os.WriteFile(jsonFile, []byte(newData), 0644)
-	return true
-}
-*/
 
 func GetSubscribes(p string) (string, error) {
 	jsonFile := strings.Join([]string{p, "data/subUrl"}, "/")
@@ -639,63 +450,6 @@ func SetIgnore(p, data string) bool {
 	return true
 }
 
-/*
-func GetNode(i int, p string) (j *config.CodeList) {
-	jsonFile := strings.Join([]string{p, "data/dataFile"}, "/")
-	data, _ := os.ReadFile(jsonFile)
-	var result []*config.CodeList
-	if len(data) > 0 {
-		var (
-			index int = len(data)
-		)
-		index = bytes.IndexByte(data, 0)
-		if index != -1 {
-			data = data[:index]
-		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return
-		}
-		if len(result) >= i {
-			for index, item := range result {
-				if index == i {
-					j = item
-					break
-				}
-			}
-		}
-	}
-	return
-}
-*/
-
-func StringSliceTointerfaceSlice(input []string) []any {
-	result := make([]any, len(input))
-	for i, v := range input {
-		result[i] = v
-	}
-	return result
-}
-
-func IgnoreRepeated(postList, dataList []string) []string {
-	if len(dataList) != 0 {
-		var temp []string
-		for _, item := range postList {
-			exist := false
-			for _, ig := range dataList {
-				if item == ig {
-					exist = true
-				}
-			}
-			if !exist {
-				temp = append(temp, item)
-			}
-		}
-		// fmt.Println(temp)
-		return temp
-	}
-	return postList
-}
-
 // RemoveRepeatedSingle Remove Repeated Element
 func RemoveRepeatedSingle(personList []string) (result []string) {
 	n := len(personList)
@@ -714,19 +468,6 @@ func RemoveRepeatedSingle(personList []string) (result []string) {
 	return
 }
 
-// ReadConfigFile read config file
-func ReadConfigFile(p, types string) (code []byte) {
-	T := strings.ToLower(types)
-	tempStart := strings.Join([]string{p, "template", "tempStart"}, "/")
-	s, _ := os.ReadFile(tempStart)
-	jsonFile := strings.Join([]string{p, "template", T}, "/")
-	c, _ := os.ReadFile(jsonFile)
-	tempEnd := strings.Join([]string{p, "template", "tempEnd"}, "/")
-	e, _ := os.ReadFile(tempEnd)
-	result := append(append(s, c...), e...)
-	return result
-}
-
 // SaveConfigFile save config file
 func SaveConfigFile(pid string, r string) {
 	getConfig := GetConfig()
@@ -735,138 +476,6 @@ func SaveConfigFile(pid string, r string) {
 	os.WriteFile(r, saveConfig, 0644)
 }
 
-/*
-// SetVmess set vmess
-func SetVmess(j *config.CodeList, p string) (b bool) {
-	code := ReadConfigFile(p, j.Types)
-	m := make(map[string]any)
-	json.Unmarshal([]byte(code), &m)
-	protocol := j.Types
-	if j.Types == "ss" {
-		protocol = "shadowsocks"
-	}
-	if j.Types == "trojan" {
-		protocol = "trojan"
-	}
-	m["outbounds"].([]any)[0].(map[string]any)["protocol"] = protocol
-	switch j.Types {
-	case "vmess":
-		vnext := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["vnext"].([]any)[0]
-		vnext.(map[string]any)["address"] = j.Address
-		vnext.(map[string]any)["port"] = j.Port
-		users := vnext.(map[string]any)["users"].([]any)[0]
-		users.(map[string]any)["id"] = j.Password
-		users.(map[string]any)["alterId"] = j.Aid
-	case "vless":
-		vnext := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["vnext"].([]any)[0]
-		vnext.(map[string]any)["address"] = j.Address
-		vnext.(map[string]any)["port"] = j.Port
-		users := vnext.(map[string]any)["users"].([]any)[0]
-		users.(map[string]any)["id"] = j.Password
-		users.(map[string]any)["flow"] = j.Flow
-		streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"]
-		streamSettings.(map[string]any)["security"] = j.Security
-		streamSettings.(map[string]any)["network"] = j.Net
-		realitySettings := streamSettings.(map[string]any)["realitySettings"]
-		realitySettings.(map[string]any)["serverName"] = j.Host
-		realitySettings.(map[string]any)["publicKey"] = j.Obfs
-		realitySettings.(map[string]any)["shortId"] = j.ObfsParam
-		realitySettings.(map[string]any)["fingerprint"] = j.Fp
-
-	case "ss":
-		users := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["servers"].([]any)[0]
-		users.(map[string]any)["address"] = j.Address
-		users.(map[string]any)["port"] = j.Port
-		users.(map[string]any)["method"] = j.Method
-		users.(map[string]any)["password"] = j.Password
-	case "trojan":
-		users := m["outbounds"].([]any)[0].(map[string]any)["settings"].(map[string]any)["servers"].([]any)[0]
-		users.(map[string]any)["address"] = j.Address
-		users.(map[string]any)["port"] = j.Port
-		users.(map[string]any)["password"] = j.Password
-		streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"].(map[string]any)["tlsSettings"]
-		streamSettings.(map[string]any)["allowInsecure"] = true
-		streamSettings.(map[string]any)["serverName"] = j.Host
-	}
-	if j.Types != "ss" {
-		if j.Types != "trojan" {
-			if j.Types != "vless" {
-				streamSettings := m["outbounds"].([]any)[0].(map[string]any)["streamSettings"]
-				streamSettings.(map[string]any)["network"] = j.Net
-				tls := "none"
-				if j.TLS {
-					tls = "tls"
-					streamSettings.(map[string]any)["tlsSettings"].(map[string]any)["allowInsecure"] = true
-				}
-				streamSettings.(map[string]any)["security"] = tls
-				streamSettings.(map[string]any)["tlsSettings"].(map[string]any)["serverName"] = j.Host
-			}
-		}
-	}
-	saveData, _ := json.Marshal(m)
-	c := strings.Join([]string{p, "Core/config.json"}, "/")
-	err := os.WriteFile(c, saveData, 0644)
-	if err != nil {
-		return false
-	}
-	RunXray(p, "reload", j.Title)
-	return true
-}
-
-// SetSSR set ssr
-func SetSSR(j *config.CodeList, p string, c string, r string, cu string) (b bool) {
-	s := ReadConfigFile(p, j.Types)
-	var ssr *config.SSR
-	//3.json解析到结构体
-	if err := json.Unmarshal(s, &ssr); err != nil {
-		return false
-	}
-	ssr.Server = j.Address
-	ssr.ServerPort = j.Port
-	ssr.Method = j.Method
-	ssr.Protocol = j.Protocol
-	ssr.ProtocolParam = j.ProtocolParam
-	ssr.Obfs = j.Obfs
-	ssr.ObfsParam = j.ObfsParam
-	ssr.Password = j.Password
-	saveData, _ := json.Marshal(&ssr)
-	err := os.WriteFile(c, saveData, 0644)
-	if err != nil {
-		return false
-	}
-	if cu == "ssr" {
-		RunCommand("/etc/config/sh/ssr.sh restart")
-		return true
-	}
-	SaveConfigFile("ssr", r)
-	return true
-}
-
-// SetTrojan set trojan
-func SetTrojan(j *config.CodeList, p string, c string, r string, cu string) (b bool) {
-	s := ReadConfigFile(p, j.Types)
-	var trojan *config.Trojan
-	if err := json.Unmarshal(s, &trojan); err != nil {
-		return false
-	}
-	trojan.RemoteAddr = j.Address
-	trojan.RemotePort = j.Port
-	trojan.Password[0] = j.Password
-	trojan.Ssl.Sni = j.Host
-	saveData, _ := json.Marshal(&trojan)
-	err := os.WriteFile(c, saveData, 0644)
-	if err != nil {
-		return false
-	}
-	if cu == "trojan" {
-		RunCommand("/etc/config/sh/trojan.sh restart")
-		return true
-	}
-	go RunCommand("/etc/config/sh/trojan.sh start")
-	SaveConfigFile("trojan", r)
-	return true
-}
-*/
 // RunCommand run command
 func RunCommand(command string) (pidstr string) {
 	// fmt.Println(command)
@@ -1297,12 +906,7 @@ func Float64ToStringWithPrecision(value float64, precision int) string {
 // checkType check type
 func checkType(a string) (c bool) {
 	l := []string{"vless", "ss", "vmess", "ssr", "trojan"}
-	for _, item := range l {
-		if item == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(l, a)
 }
 
 func MakeDates(a []string) (b []*config.CodeList) {
