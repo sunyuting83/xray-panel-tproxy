@@ -1,9 +1,19 @@
-func AddManualNode(p string, newNode config.CodeList) error {
+package utils
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	config "xpanel/Config"
+)
+
+func AddManualNode(p string, newNode *config.CodeList) error {
 	// 1. 定位手动节点文件
 	manualFile := filepath.Join(p, "data", "manual.json")
 
 	// 2. 读取现有数据
-	var manualNodes []config.CodeList
+	var manualNodes []*config.CodeList
 	data, err := os.ReadFile(manualFile)
 	if err == nil && len(data) > 0 {
 		// 处理可能存在的 null 截断
