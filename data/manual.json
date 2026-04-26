@@ -1,0 +1,26 @@
+[
+  {
+    "index": 0,
+    "uid": "0285d1eef57e",
+    "type": "socks",
+    "title": "我的自建Socks5",
+    "address": "my-socks-server.com",
+    "port": 1080,
+    "id": "admin",
+    "password": "password123",
+    "security": "",
+    "network": "",
+    "path": "",
+    "host": "",
+    "stream_security": "",
+    "sni": "",
+    "fingerprint": "",
+    "allow_insecure": false,
+    "public_key": "",
+    "short_id": "",
+    "spider_x": "",
+    "flow": "",
+    "method": "",
+    "aid": 0
+  }
+]

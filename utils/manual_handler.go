@@ -28,7 +28,7 @@ func AddManualNode(p string, newNode *config.CodeList) error {
 	newNode.UID = GenerateUID(newNode)
 
 	// 针对 Shadowsocks 的“去壳”处理，防止 Xray 报错
-	if newNode.Type == "shadowsocks" || newNode.Type == "ss" {
+	if newNode.Type == "socks" || newNode.Type == "shadowsocks" || newNode.Type == "ss" {
 		newNode.Network = ""
 		newNode.StreamSecurity = ""
 		newNode.Path = ""
@@ -37,7 +37,7 @@ func AddManualNode(p string, newNode *config.CodeList) error {
 
 	// 4. 追加并写回
 	manualNodes = append(manualNodes, newNode)
-	saveConfig, err := json.MarshalIndent(manualNodes, "", "  ")
+	saveConfig, err := json.Marshal(manualNodes)
 	if err != nil {
 		return err
 	}

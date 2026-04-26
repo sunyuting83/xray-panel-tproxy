@@ -47,7 +47,7 @@ func UpData(c *gin.Context) {
 			}
 			// fmt.Println(datas)
 			// D. 序列化并保存 (Marshal 会自动根据你 CodeList 的 tag 转换字段名)
-			saveData, err := json.MarshalIndent(datas, "", "  ")
+			saveData, err := json.Marshal(datas)
 			if err == nil {
 				os.WriteFile(dataFile, saveData, 0644)
 			}

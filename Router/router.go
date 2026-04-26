@@ -59,8 +59,7 @@ func InitRouter(CurrentPath string) *gin.Engine {
 		api.PUT("/SetDns", SetDns)
 		api.POST("/TestProxy", TestProxy)
 		api.GET("/CheckVersion", CheckVersion)
-		api.GET("/GetLocalSocks", GetLocalSocks)
-		api.PUT("/SetLocalSocks", SetLocalSocks)
+		api.POST("/AddManualNode", AddManualNode)
 	}
 
 	return router

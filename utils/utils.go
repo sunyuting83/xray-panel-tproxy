@@ -263,7 +263,7 @@ func DeleteNode(uid string, p string) bool {
 
 		// 3. 如果在该文件中找到了并删除了，写回文件并返回成功
 		if found {
-			saveConfig, _ := json.MarshalIndent(nodes, "", "  ") // 使用 Indent 方便调试查看
+			saveConfig, _ := json.Marshal(nodes) // 使用 Indent 方便调试查看
 			err = os.WriteFile(jsonFile, saveConfig, 0644)
 			return err == nil
 		}
@@ -334,7 +334,7 @@ func SetDns(p, data string) bool {
 		Servers: m,
 	}
 
-	finalJson, err := json.MarshalIndent(dnsStruct, "", "  ")
+	finalJson, err := json.Marshal(dnsStruct)
 	if err != nil {
 		return false
 	}
@@ -356,67 +356,6 @@ func SetDns(p, data string) bool {
 
 	return true
 }
-
-func GetLocalSocks(p string) map[string]any {
-	var m map[string]any = make(map[string]any)
-	m["status"] = 0
-	m["SocksStatus"] = false
-	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
-	data, err := os.ReadFile(jsonFile)
-	if err != nil {
-		m["status"] = 1
-		return m
-	}
-	dataStr := string(data)
-	if strings.Contains(dataStr, `"protocol":"socks"`) {
-		d1 := strings.Split(dataStr, `"auth":"`)[1]
-		statuStr := strings.Split(d1, `","ip":"0.0.0.0","udp"`)[0]
-		// fmt.Println(statuStr)
-		accountListStr := strings.Split(d1, `"accounts":`)[1]
-		accountListStr = strings.Split(accountListStr, `},"sniffing"`)[0]
-		// fmt.Println(accountListStr)
-		var accounts *[]Auths
-		err := json.Unmarshal([]byte(accountListStr), &accounts)
-		if err != nil {
-			fmt.Println(err)
-		}
-		if len(statuStr) != 0 {
-			if statuStr == "password" {
-				m["SocksStatus"] = true
-			}
-			m["Auths"] = accounts
-		}
-		return m
-	}
-	m["status"] = 1
-	return m
-}
-
-func SetLocalSocks(p, socks, auths string) bool {
-	var accounts *[]Auths
-	err := json.Unmarshal([]byte(auths), &accounts)
-	if err != nil {
-		return false
-	}
-	jsonFile := strings.Join([]string{p, "template/tempStart"}, "/")
-	d0, err := os.ReadFile(jsonFile)
-	if err != nil {
-		return false
-	}
-	dataStr := string(d0)
-	if strings.Contains(dataStr, `"protocol":"socks"`) {
-		d1 := strings.Split(dataStr, `"auth":"`)
-		d2 := strings.Split(d1[1], `","ip":"0.0.0.0","udp"`)
-		accountLis := strings.Split(d2[1], `"accounts":`)
-		// fmt.Println(statuStr)
-		accountListStr := strings.Split(accountLis[1], `},"sniffing"`)
-		d3 := strings.Join([]string{d1[0], `"auth":"`, socks, `","ip":"0.0.0.0","udp"`, accountLis[0], `"accounts":`, auths, `},"sniffing"`, accountListStr[1]}, "")
-		os.WriteFile(jsonFile, []byte(d3), 0644)
-		return true
-	}
-	return false
-}
-
 func SetSubscribes(p, data string) bool {
 	var newSub []string
 	if strings.Contains(data, "\n") {

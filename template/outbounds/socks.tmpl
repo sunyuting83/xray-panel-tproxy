@@ -1,0 +1,20 @@
+{
+  "protocol": "socks",
+  "settings": {
+    "servers": [
+      {
+        "address": "{{.Address}}",
+        "port": {{.Port}},
+        "users": [
+          {{if and .Password (gt (len .Password) 0)}}
+          {
+            "user": "{{.ID}}",
+            "pass": "{{.Password}}"
+          }
+          {{end}}
+        ]
+      }
+    ]
+  },
+  "tag": "outBound_PROXY"
+}

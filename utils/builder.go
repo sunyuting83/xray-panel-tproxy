@@ -199,7 +199,7 @@ func SaveCurrentUID(currentPath string, uid string) error {
 		CurrentUID: uid,
 	}
 
-	data, err := json.MarshalIndent(settings, "", "  ")
+	data, err := json.Marshal(settings)
 	if err != nil {
 		return err
 	}
@@ -227,25 +227,38 @@ func SelectNode(currentPath string, uid string) bool {
 
 // GetNodeList 从 data.json 获取完整的节点列表
 func GetNodeList(currentPath string) ([]config.CodeList, error) {
-	dataPath := filepath.Join(currentPath, "data", "data.json")
+	// 1. 定义两个文件的路径
+	subPath := filepath.Join(currentPath, "data", "data.json")
+	manualPath := filepath.Join(currentPath, "data", "manual.json")
 
-	data, err := os.ReadFile(dataPath)
-	if err != nil {
-		return nil, fmt.Errorf("读取数据文件失败: %v", err)
+	var allNodes []config.CodeList
+
+	// 3. 读取手动节点 (manualFile)
+	manualData, err := os.ReadFile(manualPath)
+	if err == nil && len(manualData) > 0 {
+		var manualList []config.CodeList
+		if err := json.Unmarshal(manualData, &manualList); err == nil {
+			allNodes = append(allNodes, manualList...)
+		}
 	}
 
-	var list []config.CodeList
-	// 检查文件是否为空
-	if len(data) == 0 {
-		return list, nil
+	// 2. 读取订阅节点 (dataFile)
+	subData, err := os.ReadFile(subPath)
+	if err == nil && len(subData) > 0 {
+		var subList []config.CodeList
+		if err := json.Unmarshal(subData, &subList); err == nil {
+			allNodes = append(allNodes, subList...)
+		}
 	}
 
-	// 直接标准反序列化，不再处理字节 0 截断
-	if err := json.Unmarshal(data, &list); err != nil {
-		return nil, fmt.Errorf("解析数据失败: %v", err)
+	// 4. 重新校准 Index
+	// 因为两个文件合并后，原始记录里的 Index 可能会重复或断层
+	// 统一按合并后的物理顺序重新赋值，方便前端表格展示
+	for i := range allNodes {
+		allNodes[i].Index = i
 	}
 
-	return list, nil
+	return allNodes, nil
 }
 
 // 定义所有受支持的规则零件名
@@ -372,7 +385,7 @@ func UpdateRule(currentPath string, ruleType string, rawContent string) error {
 	ruleData[targetKey] = cleanList
 
 	// 6. 序列化回 JSON 并存回文件
-	finalJSON, err := json.MarshalIndent(ruleData, "", "  ")
+	finalJSON, err := json.Marshal(ruleData)
 	if err != nil {
 		return fmt.Errorf("JSON 编码失败: %v", err)
 	}
