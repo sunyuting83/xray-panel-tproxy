@@ -37,7 +37,8 @@ func AddManualNode(p string, newNode *config.CodeList) error {
 
 	// 4. 追加并写回
 	manualNodes = append(manualNodes, newNode)
-	saveConfig, err := json.Marshal(manualNodes)
+	newNanualNodes := RemoveRepeatedElement(manualNodes)
+	saveConfig, err := json.Marshal(newNanualNodes)
 	if err != nil {
 		return err
 	}

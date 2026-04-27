@@ -122,7 +122,7 @@ func GetCurrentPath() (string, error) {
 func GetConfig() (j *config.Config) {
 	path, _ := os.Executable()
 	dir := filepath.Dir(path)
-	jsonFile := strings.Join([]string{dir, "data/config.json"}, "/")
+	jsonFile := strings.Join([]string{dir, "data", "config.json"}, "/")
 	configByte, _ := os.ReadFile(jsonFile)
 	var (
 		index int = len(configByte)
@@ -169,28 +169,35 @@ func IgnoreTag(a []*config.CodeList, ignore string) []*config.CodeList {
 
 // RemoveRepeatedElement Remove Repeated Element
 func RemoveRepeatedElement(personList []*config.CodeList) (result []*config.CodeList) {
-	// key 为节点唯一性特征字符串，value 为占位布尔值
+	// key 为节点唯一性特征字符串
 	seen := make(map[string]bool)
 
 	for _, node := range personList {
+		// 基础校验：端口为 0 的通常是非法数据
 		if node.Port == 0 {
 			continue
 		}
 
 		// 生成节点的唯一指纹字符串
-		// 我们将影响连接的核心参数拼接在一起
-		fingerprint := fmt.Sprintf("%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s",
-			node.Type,
-			node.Address,
-			node.Port,
-			node.ID,
-			node.Password,
-			node.Network,
-			node.StreamSecurity,
-			node.PublicKey,
-			node.ShortId,
-			node.Flow,
-			node.Method,
+		// 严格按照影响 Xray 连接的核心字段进行拼接
+		// 排除 UID (不验证UID), Title (名称不同不算重复), Index (物理索引不算重复)
+		fingerprint := fmt.Sprintf("%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%t",
+			node.Type,           // 协议类型
+			node.Address,        // 地址
+			node.Port,           // 端口
+			node.ID,             // UUID (Vless/Vmess)
+			node.Password,       // 密码 (SS/Trojan/Socks)
+			node.Method,         // 加密方式 (SS)
+			node.Network,        // 传输协议 (tcp/ws/grpc)
+			node.Path,           // 路径 (ws/grpc)
+			node.Host,           // 伪装域名 (ws/h2)
+			node.StreamSecurity, // 安全层 (tls/reality)
+			node.Sni,            // SNI
+			node.Flow,           // 流控 (xtls-rprx-vision)
+			node.PublicKey,      // Reality PublicKey
+			node.ShortId,        // Reality ShortId
+			node.Fingerprint,    // TLS 指纹
+			node.AllowInsecure,  // 是否允许跳过证书
 		)
 
 		if !seen[fingerprint] {
@@ -274,7 +281,7 @@ func DeleteNode(uid string, p string) bool {
 }
 
 func GetSubscribes(p string) (string, error) {
-	jsonFile := strings.Join([]string{p, "data/subUrl"}, "/")
+	jsonFile := strings.Join([]string{p, "data", "subUrl"}, "/")
 	data, err := os.ReadFile(jsonFile)
 	if err != nil {
 		return "", err
@@ -282,7 +289,7 @@ func GetSubscribes(p string) (string, error) {
 	return string(data), nil
 }
 func GetIgnore(p string) (string, error) {
-	jsonFile := strings.Join([]string{p, "data/ignore"}, "/")
+	jsonFile := strings.Join([]string{p, "data", "ignore"}, "/")
 	data, err := os.ReadFile(jsonFile)
 	if err != nil {
 		return "", err
