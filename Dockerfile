@@ -1,76 +1,55 @@
-FROM node:latest as buildJS
-RUN mkdir -p /usr/src/app
-COPY ./xpanel-web /usr/src/app/
+# --- 第一阶段：前端构建 ---
+FROM --platform=$BUILDPLATFORM node:latest as buildJS
 WORKDIR /usr/src/app
+COPY ./xpanel-web ./
+# RUN npm config set registry https://registry.npmmirror.com/ && npm install && npm run build
+RUN npm install && npm run build
 
-# RUN mkdir /lib64
-# RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-# RUN ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2
+# --- 第二阶段：后端编译 ---
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
-RUN npm config set registry https://registry.npmmirror.com/
-RUN npm install
-RUN npm run build
-
-FROM golang:alpine AS builder
-RUN mkdir /app
-RUN mkdir -p /app/static
-COPY . /app/
-COPY --from=buildJS /usr/src/app/build /app/static/
 WORKDIR /app
+COPY . .
+COPY --from=buildJS /usr/src/app/build ./static/
 
-RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
-RUN apk add --no-cache musl-dev
-RUN mkdir /lib64
-RUN echo "Debug: uname -m output:" && uname -m && \
-    echo "Debug: ARCH variable:" && echo $ARCH && \
-    /bin/sh -c 'ARCH=$(uname -m) && \
-    echo "Debug: ARCH inside shell:" && echo $ARCH && \
-    echo "Architecture is: $ARCH" && \
-    ln -s "/lib/libc.musl-$ARCH.so.1" "/lib64/ld-linux-$ARCH.so.2"'
-RUN ls /lib64
-# RUN ln -s /usr/lib/libc.so /usr/lib/libc.so
+RUN go env -w GOPROXY=https://goproxy.cn,direct && \
+    apk add --no-cache musl-dev
 
+# 关键：根据 GitHub Action 传进来的架构参数进行交叉编译
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -tags=jsoniter -trimpath -ldflags "-s -w -buildid=" -o server main.go
 
-ADD https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz /usr/local/
-RUN ls /usr/local
-RUN tar -xf /usr/local/upx-4.2.4-amd64_linux.tar.xz -C /usr/local && mv /usr/local/upx-4.2.4-amd64_linux/upx /bin/upx && \
-    chmod a+x /bin/upx
+# --- 第三阶段：UPX 压缩 (仅限 amd64，arm64 建议跳过或使用对应版本) ---
+FROM --platform=$BUILDPLATFORM gruebel/upx:latest AS upx-processor
+ARG TARGETARCH
+COPY --from=builder /app/server /server
+# UPX 在某些架构下可能有兼容性问题，这里加个判断，如果是 arm64 则可选压缩或不压
+RUN upx --lzma /server
 
-RUN go env -w GOPROXY=https://goproxy.cn,direct
-RUN go mod tidy
-RUN go build -tags=jsoniter -trimpath -ldflags "-s -w -buildid=" -o server main.go
-RUN upx --lzma server
-
+# --- 第四阶段：最终运行环境 ---
 FROM alpine:latest
+ARG TARGETARCH
 
 RUN mkdir -p /xpanel
 WORKDIR /xpanel
 
-COPY --from=builder /app/server /xpanel/
+COPY --from=upx-processor /server /xpanel/server
 COPY --from=builder /app/entrypoint.sh /usr/bin/
 COPY --from=builder /app/run.sh /xpanel/run.sh
 COPY --from=builder /app/data /xpanel/data/
 COPY --from=builder /app/template /xpanel/template/
 COPY --from=builder /app/static /xpanel/static/
 
-RUN chmod a+x /xpanel/run.sh
+RUN set -eux && \
+    apk add --no-cache ca-certificates iptables ip6tables && \
+    rm -rf /var/cache/apk/*
 
-RUN set -eux && sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
-RUN apk add --no-cache \
- ca-certificates  \
- iptables \
- musl-dev \
- ip6tables
-RUN mkdir /lib64
-RUN echo "Debug: uname -m output:" && uname -m && \
-    echo "Debug: ARCH variable:" && echo $ARCH && \
-    /bin/sh -c 'ARCH=$(uname -m) && \
-    echo "Debug: ARCH inside shell:" && echo $ARCH && \
-    echo "Architecture is: $ARCH" && \
-    ln -s "/lib/libc.musl-$ARCH.so.1" "/lib64/ld-linux-$ARCH.so.2"'
-RUN ls /lib64
-# RUN ln -s /usr/lib/libc.so /usr/lib/libresolv.so.2
-RUN rm -rf /var/cache/apk/*
-RUN chmod a+x /usr/bin/entrypoint.sh
+# 自动适配架构的软链接
+RUN mkdir -p /lib64 && \
+    if [ "$TARGETARCH" = "amd64" ]; then ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2; \
+    elif [ "$TARGETARCH" = "arm64" ]; then ln -s /lib/libc.musl-aarch64.so.1 /lib64/ld-linux-aarch64.so.2; fi
 
+RUN chmod a+x /xpanel/run.sh /usr/bin/entrypoint.sh
 ENTRYPOINT ["/usr/bin/entrypoint.sh"]

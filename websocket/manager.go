@@ -18,23 +18,48 @@ import (
 
 func TestTCPing(ID string) {
 	current_path, _ := utils.GetCurrentPath()
-	jsonFile := filepath.Join(current_path, "data", "data.json")
-	data, _ := os.ReadFile(jsonFile)
-	list := utils.ListToJsons(data)
-	if len(*list) > 0 {
-		for _, item := range *list {
+
+	// 定义需要测试的文件列表
+	paths := []string{
+		filepath.Join(current_path, "data", "manual.json"),
+		filepath.Join(current_path, "data", "data.json"),
+	}
+
+	// 合并后的节点列表
+	var fullList []config.CodeList
+
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			data, _ := os.ReadFile(p)
+			// 假设 ListToJsons 返回的是 *[]config.CodeList
+			list := utils.ListToJsons(data)
+			if list != nil && len(*list) > 0 {
+				fullList = append(fullList, *list...)
+			}
+		}
+	}
+
+	if len(fullList) > 0 {
+		for _, item := range fullList {
 			port := strconv.Itoa(item.Port)
+			// 注意：如果你的前端依赖 Index 来定位表格行，
+			// 请确保手动添加节点时分配了唯一的 Index，或者此处改用 UID 推送
 			index := strconv.Itoa(item.Index)
+
 			elapsedTime, err := TCPing(item.Address, port)
 			speed := "0"
 			if err == nil {
+				// 转换为毫秒并保留两位小数
 				speed = Float64ToStringWithPrecision(elapsedTime.Seconds()*1000, 2)
 			}
+
 			speeData := &config.Message{
 				Type: "tcping",
 				UUID: ID,
-				Data: strings.Join([]string{index, speed}, "||||"),
+				// 保持原有的格式：index||||speed
+				Data: strings.Join([]string{item.UID, speed, index}, "||||"),
 			}
+
 			sedData, _ := json.Marshal(speeData)
 			Manager.Broadcast(sedData)
 		}

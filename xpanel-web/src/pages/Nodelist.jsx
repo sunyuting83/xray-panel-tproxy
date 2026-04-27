@@ -32,12 +32,12 @@ const NodeList = () => {
     try {
       const jsonData = JSON.parse(event.data)
       if (jsonData.type === "tcping" && jsonData.data.includes('||||')) {
-        const [indexStr, speedStr] = jsonData.data.split("||||")
+        const [UIDStr, speedStr, indexStr] = jsonData.data.split("||||")
         const i = parseInt(indexStr)
         const speedNumber = parseFloat(speedStr)
 
-        setData(prevData => prevData.map((item, index) => {
-          if (i === index) return { ...item, ping: speedNumber }
+        setData(prevData => prevData.map((item) => {
+          if (item.uid === UIDStr) return { ...item, ping: speedNumber }
           return item
         }))
 

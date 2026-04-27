@@ -165,26 +165,38 @@ func GetCurrentUID(currentPath string) string {
 
 // GetNodeByUID 从 data.json 中根据 UID 查找节点
 func GetNodeByUID(currentPath string, uid string) (*config.CodeList, error) {
-	dataPath := filepath.Join(currentPath, "data", "data.json")
-
-	data, err := os.ReadFile(dataPath)
-	if err != nil {
-		return nil, fmt.Errorf("读取 data.json 失败: %v", err)
+	// 定义两个数据源路径
+	dataSources := []string{
+		filepath.Join(currentPath, "data", "data.json"),
+		filepath.Join(currentPath, "data", "manual.json"),
 	}
 
-	var nodeList []*config.CodeList
-	if err := json.Unmarshal(data, &nodeList); err != nil {
-		return nil, fmt.Errorf("解析 data.json 失败: %v", err)
-	}
+	for _, path := range dataSources {
+		// 检查文件是否存在，不存在则跳过（防止初次运行没有 manual.json 报错）
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
 
-	// 遍历查找匹配的 UID
-	for _, node := range nodeList {
-		if node.UID == uid {
-			return node, nil
+		data, err := os.ReadFile(path)
+		if err != nil {
+			// 这里记录日志但不中断，尝试下一个文件
+			continue
+		}
+
+		var nodeList []*config.CodeList
+		if err := json.Unmarshal(data, &nodeList); err != nil {
+			continue
+		}
+
+		// 遍历查找匹配的 UID
+		for _, node := range nodeList {
+			if node.UID == uid {
+				return node, nil
+			}
 		}
 	}
 
-	return nil, fmt.Errorf("未找到 UID 为 %s 的节点", uid)
+	return nil, fmt.Errorf("在订阅和手动节点中均未找到 UID 为 %s 的节点", uid)
 }
 
 // --- 辅助写入函数 (给 SelectNode 使用) ---
