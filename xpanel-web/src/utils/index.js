@@ -18,7 +18,7 @@ const urilist = {
   'testproxy': `${Rooturi}api/TestProxy`,
   'checkVersion': `${Rooturi}api/CheckVersion`,
   'getSocks': `${Rooturi}api/GetLocalSocks`,
-  'setLocalSocks': `${Rooturi}api/SetLocalSocks`,
+  'addManualNode': `${Rooturi}api/AddManualNode`,
 }
 export {
   httpServer,

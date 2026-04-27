@@ -13,6 +13,7 @@ const Subscribe = lazy(() => import('./pages/Subscribe'))
 const SetDns = lazy(() => import('./pages/SetDns'))
 const CheckVersion = lazy(() => import('./pages/CheckVersion'))
 const SetSocks = lazy(() => import('./pages/SetSocks'))
+const AddManualNode = lazy(() => import('./pages/AddManualNode'))
 function App() {
   return (
     <div className="App">
@@ -39,6 +40,7 @@ function App() {
             <Route path='/setdns' element={<SetDns />} />
             <Route path='/update' element={<CheckVersion />} />
             <Route path='/setsocks' element={<SetSocks />} />
+            <Route path='/addmanual' element={<AddManualNode />} />
           </Routes>
           </Suspense>
         </HistoryRouter>
