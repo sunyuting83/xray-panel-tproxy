@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"path/filepath"
 
 	"xpanel/utils"
 	"xpanel/websocket"
@@ -24,10 +25,10 @@ func InitRouter(CurrentPath string) *gin.Engine {
 	// 初始化 gws Upgrader
 	upgrader := gws.NewUpgrader(websocket.Manager, &gws.ServerOption{})
 	router.Use(utils.CORSMiddleware())
-	router.StaticFS("/static/css", http.Dir("static/static/css"))
-	router.StaticFS("/static/js", http.Dir("static/static/js"))
-	router.StaticFile("/favicon.ico", "static/favicon.ico")
-	router.LoadHTMLGlob("static/index.html")
+	router.StaticFS("/static/css", http.Dir(filepath.Join(CurrentPath, "static", "static", "css")))
+	router.StaticFS("/static/js", http.Dir(filepath.Join(CurrentPath, "static", "static", "js")))
+	router.StaticFile("/favicon.ico", filepath.Join(CurrentPath, "static", "favicon.ico"))
+	router.LoadHTMLGlob(filepath.Join(CurrentPath, "static", "index.html"))
 
 	router.GET("/ws", func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request)
